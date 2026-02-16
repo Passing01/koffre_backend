@@ -1,0 +1,156 @@
+{
+  "info": {
+    "name": "Kofre Backend API",
+    "_postman_id": "b3a1b0d0-1111-4e22-aaaa-123456789000",
+    "description": "OTP Auth + Cagnottes + Contributions (simulation) + Ledger",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "base_url", "value": "http://127.0.0.1:8000"},
+    {"key": "token", "value": ""},
+    {"key": "phone", "value": "+22670000000"},
+    {"key": "otp", "value": "123456"},
+    {"key": "cagnotte_id", "value": "1"}
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/api/auth/send-otp", "host": ["{{base_url}}"], "path": ["api", "auth", "send-otp"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"fullname\": \"Test User\",\n  \"country_code\": \"BF\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify OTP (save token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.data && json.data.token) {",
+                  "  pm.collectionVariables.set('token', json.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": {"raw": "{{base_url}}/api/auth/verify-otp", "host": ["{{base_url}}"], "path": ["api", "auth", "verify-otp"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"otp_code\": \"{{otp}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cagnottes",
+      "item": [
+        {
+          "name": "Create cagnotte (private)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {"raw": "{{base_url}}/api/cagnottes", "host": ["{{base_url}}"], "path": ["api", "cagnottes"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Cagnotte Test\",\n  \"description\": \"Demo\",\n  \"target_amount\": 100000,\n  \"visibility\": \"private\",\n  \"payout_mode\": \"escrow\",\n  \"payout_method\": \"orange_money\",\n  \"payout_account\": \"+22670000000\",\n  \"ends_at\": \"2030-01-01 12:00:00\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List public cagnottes",
+          "request": {
+            "method": "GET",
+            "url": {"raw": "{{base_url}}/api/cagnottes/publiques", "host": ["{{base_url}}"], "path": ["api", "cagnottes", "publiques"]}
+          }
+        },
+        {
+          "name": "My cagnottes",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{base_url}}/api/my-cagnottes", "host": ["{{base_url}}"], "path": ["api", "my-cagnottes"]}
+          }
+        },
+        {
+          "name": "Show cagnotte (with contributions)",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{base_url}}/api/cagnottes/{{cagnotte_id}}", "host": ["{{base_url}}"], "path": ["api", "cagnottes", "{{cagnotte_id}}"]}
+          }
+        },
+        {
+          "name": "Add participant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {"raw": "{{base_url}}/api/cagnottes/{{cagnotte_id}}/participants", "host": ["{{base_url}}"], "path": ["api", "cagnottes", "{{cagnotte_id}}", "participants"]},
+            "body": {"mode": "raw", "raw": "{\n  \"phone\": \"+22670000001\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contributions (simulation)",
+      "item": [
+        {
+          "name": "Simulate contribution",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {"raw": "{{base_url}}/api/contribute/simulate", "host": ["{{base_url}}"], "path": ["api", "contribute", "simulate"]},
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cagnotte_id\": {{cagnotte_id}},\n  \"amount\": 5000,\n  \"contributor_name\": \"Test\",\n  \"payment_method\": \"simulation\"\n}"
+            }
+          }
+        },
+        {
+          "name": "My contributions",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{base_url}}/api/my-contributions", "host": ["{{base_url}}"], "path": ["api", "my-contributions"]}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ledger",
+      "item": [
+        {
+          "name": "Cagnotte transactions",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": {"raw": "{{base_url}}/api/cagnottes/{{cagnotte_id}}/transactions", "host": ["{{base_url}}"], "path": ["api", "cagnottes", "{{cagnotte_id}}", "transactions"]}
+          }
+        }
+      ]
+    }
+  ]
+}
