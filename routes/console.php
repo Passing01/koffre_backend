@@ -57,3 +57,7 @@ Artisan::command('cagnottes:close-expired', function () {
 Schedule::command('cagnottes:close-expired')
     ->everyMinute()
     ->withoutOverlapping();
+
+Schedule::command('app:cagnotte-deadline-alert')
+    ->hourly()
+    ->withoutOverlapping();

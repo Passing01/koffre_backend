@@ -7,14 +7,17 @@ use App\Models\Contribution;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Audit\AuditService;
+use App\Services\Notifications\FcmService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ContributionSimulationService
 {
-    public function __construct(private readonly AuditService $auditService)
-    {
+    public function __construct(
+        private readonly AuditService $auditService,
+        private readonly FcmService $fcmService
+    ) {
     }
 
     public function simulate(
@@ -104,6 +107,52 @@ class ContributionSimulationService
                     'reference' => $reference,
                 ],
             );
+
+            // Notify Contributor (if logged in)
+            if ($actor) {
+                $this->fcmService->sendToUser(
+                    $actor,
+                    "Merci !",
+                    "Votre contribution (simulée) de {$amount} XOF à la cagnotte '{$cagnotte->title}' a été confirmée."
+                );
+            }
+
+            // Notify Owner
+            $contributorNameLabel = $actor?->fullname ?? $contributorName ?? 'Un invité';
+            $this->fcmService->sendToUser(
+                $cagnotte->user,
+                "Nouvelle contribution",
+                "{$contributorNameLabel} vient de contribuer (simulée) {$amount} XOF à votre cagnotte '{$cagnotte->title}'."
+            );
+
+            // Check if 100% reached
+            if ($cagnotte->target_amount > 0 && $cagnotte->current_amount >= $cagnotte->target_amount) {
+                // Notify Owner
+                $this->fcmService->sendToUser(
+                    $cagnotte->user,
+                    "Objectif atteint !",
+                    "Félicitations ! Votre cagnotte '{$cagnotte->title}' a atteint son objectif de {$cagnotte->target_amount} XOF."
+                );
+
+                // Notify all contributors
+                $distinctContributors = $cagnotte->contributions()
+                    ->where('payment_status', 'success')
+                    ->whereNotNull('user_id')
+                    ->with('user')
+                    ->get()
+                    ->pluck('user')
+                    ->unique('id');
+
+                foreach ($distinctContributors as $contributor) {
+                    if ($contributor->id !== $cagnotte->user_id) {
+                        $this->fcmService->sendToUser(
+                            $contributor,
+                            "Objectif atteint !",
+                            "La cagnotte '{$cagnotte->title}' à laquelle vous avez contribué a atteint son objectif !"
+                        );
+                    }
+                }
+            }
 
             return [
                 'contribution' => $contribution,

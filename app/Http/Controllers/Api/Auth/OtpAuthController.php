@@ -45,4 +45,19 @@ class OtpAuthController extends Controller
             'data' => $result,
         ]);
     }
+
+    public function updateFcmToken(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $request->validate([
+            'fcm_token' => ['required', 'string'],
+        ]);
+
+        $request->user()->update([
+            'fcm_token' => $request->string('fcm_token')->toString(),
+        ]);
+
+        return response()->json([
+            'message' => 'Token FCM mis à jour.',
+        ]);
+    }
 }

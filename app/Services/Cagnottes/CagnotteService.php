@@ -6,14 +6,17 @@ use App\Models\Cagnotte;
 use App\Models\Participant;
 use App\Models\User;
 use App\Services\Audit\AuditService;
+use App\Services\Notifications\FcmService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class CagnotteService
 {
-    public function __construct(private readonly AuditService $auditService)
-    {
+    public function __construct(
+        private readonly AuditService $auditService,
+        private readonly FcmService $fcmService
+    ) {
     }
 
     public function listPublic(): Collection
@@ -61,6 +64,12 @@ class CagnotteService
                     'ends_at' => optional($cagnotte->ends_at)->toISOString(),
                     'participants_count' => count($participants),
                 ],
+            );
+
+            $this->fcmService->sendToUser(
+                $user,
+                "Félicitations !",
+                "Votre cagnotte '{$cagnotte->title}' a été créée avec succès."
             );
 
             return $cagnotte;

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('auth')->group(function () {
     Route::post('/send-otp', [OtpAuthController::class, 'sendOtp'])->middleware('throttle:otp-send');
     Route::post('/verify-otp', [OtpAuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
+    Route::post('/update-fcm-token', [OtpAuthController::class, 'updateFcmToken'])->middleware('auth:sanctum');
 });
 
 Route::prefix('cagnottes')->group(function () {

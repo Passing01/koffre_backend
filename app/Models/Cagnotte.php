@@ -24,6 +24,7 @@ class Cagnotte extends Model
         'starts_at',
         'ends_at',
         'status',
+        'notified_admin_24h',
     ];
 
     protected $casts = [

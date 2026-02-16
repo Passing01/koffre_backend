@@ -26,6 +26,7 @@ class User extends Authenticatable
         'otp_expires_at',
         'is_verified',
         'country_code',
+        'fcm_token',
     ];
 
     /**
