@@ -44,6 +44,32 @@ class CagnotteService
             $participants = $data['participants'] ?? [];
             unset($data['participants']);
 
+            // Handle file uploads
+            if (isset($data['profile_photo'])) {
+                $data['profile_photo_path'] = $data['profile_photo']->store('cagnottes/profiles', 'public');
+                unset($data['profile_photo']);
+            }
+            if (isset($data['company_logo'])) {
+                $data['company_logo_path'] = $data['company_logo']->store('cagnottes/logos', 'public');
+                unset($data['company_logo']);
+            }
+            if (isset($data['identity_document'])) {
+                $data['identity_document_path'] = $data['identity_document']->store('cagnottes/documents', 'public');
+                unset($data['identity_document']);
+            }
+            if (isset($data['rccm_document'])) {
+                $data['rccm_document_path'] = $data['rccm_document']->store('cagnottes/documents', 'public');
+                unset($data['rccm_document']);
+            }
+            if (isset($data['ifu_document'])) {
+                $data['ifu_document_path'] = $data['ifu_document']->store('cagnottes/documents', 'public');
+                unset($data['ifu_document']);
+            }
+            if (isset($data['signed_contract'])) {
+                $data['signed_contract_path'] = $data['signed_contract']->store('cagnottes/contracts', 'public');
+                unset($data['signed_contract']);
+            }
+
             $cagnotte = Cagnotte::query()->create($data);
 
             foreach ($participants as $phone) {
@@ -61,6 +87,7 @@ class CagnotteService
                 metadata: [
                     'visibility' => $cagnotte->visibility,
                     'payout_mode' => $cagnotte->payout_mode,
+                    'creator_type' => $cagnotte->creator_type,
                     'ends_at' => optional($cagnotte->ends_at)->toISOString(),
                     'participants_count' => count($participants),
                 ],

@@ -21,6 +21,17 @@ class Cagnotte extends Model
         'payout_mode',
         'payout_method',
         'payout_account',
+        'payout_accounts',
+        'creator_type',
+        'profile_photo_path',
+        'identity_document_path',
+        'business_name',
+        'company_logo_path',
+        'rccm_number',
+        'ifu_number',
+        'rccm_document_path',
+        'ifu_document_path',
+        'signed_contract_path',
         'starts_at',
         'ends_at',
         'status',
@@ -30,9 +41,49 @@ class Cagnotte extends Model
     protected $casts = [
         'target_amount' => 'decimal:2',
         'current_amount' => 'decimal:2',
+        'payout_accounts' => 'array',
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
     ];
+
+    protected $appends = [
+        'profile_photo_url',
+        'identity_document_url',
+        'company_logo_url',
+        'rccm_document_url',
+        'ifu_document_url',
+        'signed_contract_url',
+    ];
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return $this->profile_photo_path ? asset('storage/' . $this->profile_photo_path) : null;
+    }
+
+    public function getIdentityDocumentUrlAttribute(): ?string
+    {
+        return $this->identity_document_path ? asset('storage/' . $this->identity_document_path) : null;
+    }
+
+    public function getCompanyLogoUrlAttribute(): ?string
+    {
+        return $this->company_logo_path ? asset('storage/' . $this->company_logo_path) : null;
+    }
+
+    public function getRccmDocumentUrlAttribute(): ?string
+    {
+        return $this->rccm_document_path ? asset('storage/' . $this->rccm_document_path) : null;
+    }
+
+    public function getIfuDocumentUrlAttribute(): ?string
+    {
+        return $this->ifu_document_path ? asset('storage/' . $this->ifu_document_path) : null;
+    }
+
+    public function getSignedContractUrlAttribute(): ?string
+    {
+        return $this->signed_contract_path ? asset('storage/' . $this->signed_contract_path) : null;
+    }
 
     public function user(): BelongsTo
     {
