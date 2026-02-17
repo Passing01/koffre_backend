@@ -19,7 +19,16 @@ Route::get('/payments/cancel', function () {
     return view('contributions.cancel');
 })->name('payment.cancel');
 
-Route::prefix('admin')->middleware(['admin'])->group(function () {
+// Admin Authentication Routes
+Route::prefix('admin')->group(function () {
+    Route::get('/login', [\App\Http\Controllers\Web\Admin\AdminAuthController::class, 'showLoginForm'])->name('admin.login');
+    Route::post('/login', [\App\Http\Controllers\Web\Admin\AdminAuthController::class, 'sendOtp'])->name('admin.send-otp');
+    Route::get('/verify-otp', [\App\Http\Controllers\Web\Admin\AdminAuthController::class, 'showVerifyForm'])->name('admin.verify-otp');
+    Route::post('/verify-otp', [\App\Http\Controllers\Web\Admin\AdminAuthController::class, 'verifyOtp'])->name('admin.verify-otp.submit');
+    Route::post('/logout', [\App\Http\Controllers\Web\Admin\AdminAuthController::class, 'logout'])->name('admin.logout');
+});
+
+Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::get('/', [\App\Http\Controllers\Web\Admin\AdminDashboardController::class, 'index'])->name('admin.dashboard');
     Route::get('/cagnottes', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'index'])->name('admin.cagnottes.index');
     Route::get('/cagnottes/{id}', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'show'])->name('admin.cagnottes.show');
