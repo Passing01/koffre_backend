@@ -25,6 +25,7 @@ class User extends Authenticatable
         'otp_code',
         'otp_expires_at',
         'is_verified',
+        'is_admin',
         'country_code',
         'fcm_token',
     ];
@@ -48,6 +49,7 @@ class User extends Authenticatable
         return [
             'otp_expires_at' => 'datetime',
             'is_verified' => 'boolean',
+            'is_admin' => 'boolean',
         ];
     }
 

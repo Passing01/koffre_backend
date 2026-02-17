@@ -18,3 +18,12 @@ Route::get('/payments/success', function () {
 Route::get('/payments/cancel', function () {
     return view('contributions.cancel');
 })->name('payment.cancel');
+
+Route::prefix('admin')->middleware(['admin'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\Web\Admin\AdminDashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/cagnottes', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'index'])->name('admin.cagnottes.index');
+    Route::get('/cagnottes/{id}', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'show'])->name('admin.cagnottes.show');
+    Route::get('/transactions', [\App\Http\Controllers\Web\Admin\AdminTransactionController::class, 'index'])->name('admin.transactions.index');
+});
+
+
