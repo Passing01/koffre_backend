@@ -73,8 +73,51 @@
         <h1>Merci beaucoup !</h1>
         <p>Votre contribution a été enregistrée avec succès. Elle sera visible sur la cagnotte dès que le paiement sera
             confirmé par l'opérateur.</p>
+
+        <div id="simulation-status"
+            style="display: none; margin-bottom: 20px; padding: 15px; border-radius: 12px; background: #fef3c7; color: #92400e; font-size: 14px; border: 1px solid #fde68a;">
+            <i class="fas fa-robot mr-2"></i> Mode Simulation : <span id="status-text">Validation en cours...</span>
+        </div>
+
         <a href="/" class="btn">Retour à Koffre</a>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+
+            if (token && token.startsWith('sim_token_')) {
+                const statusDiv = document.getElementById('simulation-status');
+                const statusText = document.getElementById('status-text');
+                statusDiv.style.display = 'block';
+
+                console.log('Simulation token detected, triggering webhook...', token);
+
+                fetch('/api/payments/paydunya/webhook', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ token: token })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Webhook triggered successfully:', data);
+                        statusText.innerText = 'Paiement simulé validé avec succès !';
+                        statusDiv.style.background = '#d1fae5';
+                        statusDiv.style.color = '#065f46';
+                        statusDiv.style.borderColor = '#a7f3d0';
+                    })
+                    .catch(error => {
+                        console.error('Error triggering simulated webhook:', error);
+                        statusText.innerText = 'Échec de la simulation du webhook.';
+                    });
+            }
+        });
+    </script>
 </body>
 
 </html>

@@ -13,14 +13,16 @@ class PayDunyaService implements PaymentServiceInterface
     private string $token;
     private string $mode;
     private string $baseUrl;
+    private bool $isSimulation;
 
     public function __construct()
     {
-        $this->masterKey = config('services.paydunya.master_key');
-        $this->privateKey = config('services.paydunya.private_key');
-        $this->publicKey = config('services.paydunya.public_key');
-        $this->token = config('services.paydunya.token');
+        $this->masterKey = config('services.paydunya.master_key') ?? '';
+        $this->privateKey = config('services.paydunya.private_key') ?? '';
+        $this->publicKey = config('services.paydunya.public_key') ?? '';
+        $this->token = config('services.paydunya.token') ?? '';
         $this->mode = config('services.paydunya.mode', 'test');
+        $this->isSimulation = config('services.paydunya.simulation', false);
 
         $this->baseUrl = "https://app.paydunya.com/api/v1";
     }
@@ -32,6 +34,14 @@ class PayDunyaService implements PaymentServiceInterface
         string $description,
         array $customer
     ): array {
+        if ($this->isSimulation) {
+            $fakeToken = 'sim_token_' . bin2hex(random_bytes(8));
+            return [
+                'payment_url' => url("/payments/success?token={$fakeToken}"),
+                'payment_token' => $fakeToken,
+            ];
+        }
+
         $response = Http::withHeaders([
             'PAYDUNYA-MASTER-KEY' => $this->masterKey,
             'PAYDUNYA-PRIVATE-KEY' => $this->privateKey,
@@ -63,19 +73,24 @@ class PayDunyaService implements PaymentServiceInterface
 
         $data = $response->json();
 
-        if ($data['response_code'] !== '00') {
+        if (($data['response_code'] ?? '') !== '00') {
             Log::error('PayDunya API Error', $data);
             throw new \Exception($data['response_text'] ?? 'Erreur API PayDunya.');
         }
 
         return [
-            'payment_url' => $data['response_text'], // PayDunya returns URL in response_text for successful invoice creation
+            'payment_url' => $data['response_text'],
             'payment_token' => $data['token'],
         ];
     }
 
     public function verifyPayment(string $token): bool
     {
+        if ($this->isSimulation || str_starts_with($token, 'sim_token_')) {
+            Log::info('PayDunya verifyPayment SIMULATED', ['token' => $token]);
+            return true;
+        }
+
         $response = Http::withHeaders([
             'PAYDUNYA-MASTER-KEY' => $this->masterKey,
             'PAYDUNYA-PRIVATE-KEY' => $this->privateKey,
@@ -88,6 +103,6 @@ class PayDunyaService implements PaymentServiceInterface
 
         $data = $response->json();
 
-        return ($data['status'] === 'completed' || $data['status'] === 'success');
+        return (($data['status'] ?? '') === 'completed' || ($data['status'] ?? '') === 'success');
     }
 }

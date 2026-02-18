@@ -55,6 +55,7 @@ return [
         'public_key' => env('PAYDUNYA_PUBLIC_KEY'),
         'token' => env('PAYDUNYA_TOKEN'),
         'mode' => env('PAYDUNYA_MODE', 'test'),
+        'simulation' => env('PAYDUNYA_SIMULATION', false),
     ],
 
 ];
