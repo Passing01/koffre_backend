@@ -102,4 +102,14 @@ class AdminCagnotteController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
+
+    public function processPayout(Request $request, int $id)
+    {
+        try {
+            $this->cagnotteService->processPayout($id, $request->user());
+            return back()->with('success', 'Versement effectué avec succès et fonds transférés au créateur.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
 }

@@ -121,6 +121,59 @@
                         @endif
                     </div>
                 </div>
+
+                <!-- Payout Section -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 {{ $cagnotte->payout_processed_at ? 'border-indigo-500' : 'border-gray-200' }}">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-paper-plane text-indigo-600"></i> Versement des fonds
+                    </h3>
+
+                    @if($cagnotte->payout_processed_at)
+                        <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center gap-4">
+                            <div class="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+                                <i class="fas fa-check-double text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-indigo-900 font-bold">Versement effectué</p>
+                                <p class="text-indigo-700 text-sm">Les fonds ont été transférés le {{ $cagnotte->payout_processed_at->format('d/m/Y à H:i') }}</p>
+                            </div>
+                        </div>
+                    @else
+                        @php
+                            $isEligible = $cagnotte->unlock_status === 'approved' && ($cagnotte->ends_at && $cagnotte->ends_at->isPast());
+                        @endphp
+
+                        <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div class="space-y-2">
+                                <p class="text-sm text-gray-600">Conditions de versement :</p>
+                                <ul class="text-sm space-y-1">
+                                    <li class="flex items-center gap-2 {{ $cagnotte->unlock_status === 'approved' ? 'text-green-600 font-medium' : 'text-gray-400' }}">
+                                        <i class="fas fa-{{ $cagnotte->unlock_status === 'approved' ? 'check-circle' : 'circle' }}"></i>
+                                        Déblocage approuvé
+                                    </li>
+                                    <li class="flex items-center gap-2 {{ ($cagnotte->ends_at && $cagnotte->ends_at->isPast()) ? 'text-green-600 font-medium' : 'text-gray-400' }}">
+                                        <i class="fas fa-{{ ($cagnotte->ends_at && $cagnotte->ends_at->isPast()) ? 'check-circle' : 'circle' }}"></i>
+                                        Date limite atteinte ({{ $cagnotte->ends_at ? $cagnotte->ends_at->format('d/m/Y') : 'Non définie' }})
+                                    </li>
+                                </ul>
+                            </div>
+
+                            @if($isEligible)
+                                <form action="{{ route('admin.cagnottes.process-payout', $cagnotte->id) }}" method="POST" onsubmit="return confirm('Confirmer le versement direct de {{ number_format($cagnotte->current_amount, 0, ',', ' ') }} FCFA au créateur ? Cette opération est irréversible.')">
+                                    @csrf
+                                    <button type="submit" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center gap-3 transform hover:scale-105">
+                                        <i class="fas fa-money-bill-wave text-xl"></i>
+                                        Effectuer le versement
+                                    </button>
+                                </form>
+                            @else
+                                <div class="px-6 py-3 bg-gray-50 border border-gray-100 rounded-xl text-gray-400 text-sm italic">
+                                    En attente des conditions d'éligibilité
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                </div>
                 @endif
 
                 <!-- Cagnotte Information -->

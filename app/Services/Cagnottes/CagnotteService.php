@@ -11,11 +11,15 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
+use App\Models\Transaction;
+use App\Services\Payments\PaymentServiceInterface;
+
 class CagnotteService
 {
     public function __construct(
         private readonly AuditService $auditService,
-        private readonly FcmService $fcmService
+        private readonly FcmService $fcmService,
+        private readonly PaymentServiceInterface $paymentService
     ) {
     }
 
@@ -326,6 +330,79 @@ class CagnotteService
             );
 
             // TODO: Notification user
+
+            return $cagnotte;
+        });
+    }
+
+    public function processPayout(int $cagnotteId, User $adminUser): Cagnotte
+    {
+        $cagnotte = Cagnotte::query()->with('user')->findOrFail($cagnotteId);
+
+        if ($cagnotte->payout_processed_at) {
+            throw ValidationException::withMessages(['payout' => ['Le versement a déjà été effectué.']]);
+        }
+
+        if ($cagnotte->payout_mode !== 'escrow') {
+            throw ValidationException::withMessages(['payout' => ['Seules les cagnottes en mode coffre nécessitent un versement manuel de l\'admin.']]);
+        }
+
+        if ($cagnotte->unlock_status !== 'approved') {
+            throw ValidationException::withMessages(['payout' => ['La demande de déblocage doit être approuvée avant le versement.']]);
+        }
+
+        if ($cagnotte->ends_at && $cagnotte->ends_at->isFuture()) {
+            throw ValidationException::withMessages(['payout' => ['La date limite de la cagnotte n\'est pas encore atteinte.']]);
+        }
+
+        if ($cagnotte->current_amount <= 0) {
+            throw ValidationException::withMessages(['payout' => ['Le montant de la cagnotte est nul.']]);
+        }
+
+        return DB::transaction(function () use ($cagnotte, $adminUser) {
+            // Use the primary payout account if available, otherwise fallback to user's phone
+            $payoutAccount = $cagnotte->payout_account ?? $cagnotte->user->phone;
+
+            // Call the payment service payout
+            $success = $this->paymentService->payout(
+                account: $payoutAccount,
+                amount: (float) $cagnotte->current_amount,
+                description: "Versement Koffre - Cagnotte #{$cagnotte->id}: {$cagnotte->title}"
+            );
+
+            if (!$success) {
+                throw new \Exception("Échec lors de l'appel à l'API de paiement pour le versement.");
+            }
+
+            // Mark as processed
+            $cagnotte->update(['payout_processed_at' => now()]);
+
+            // Create Transaction entry (debit from the cagnotte)
+            Transaction::query()->create([
+                'cagnotte_id' => $cagnotte->id,
+                'type' => 'debit',
+                'amount' => $cagnotte->current_amount,
+                'balance_after' => 0, // Since we sent everything
+                'reference' => 'PAYOUT-' . $cagnotte->id . '-' . time(),
+            ]);
+
+            $this->auditService->log(
+                action: 'cagnotte.payout_processed',
+                actorUserId: $adminUser->id,
+                auditableType: 'cagnotte',
+                auditableId: $cagnotte->id,
+                metadata: [
+                    'amount' => $cagnotte->current_amount,
+                    'payout_account' => $payoutAccount,
+                ],
+            );
+
+            // Notify user
+            $this->fcmService->sendToUser(
+                $cagnotte->user,
+                "Fonds transférés !",
+                "Le versement de {$cagnotte->current_amount} XOF pour votre cagnotte '{$cagnotte->title}' a été effectué sur votre compte."
+            );
 
             return $cagnotte;
         });

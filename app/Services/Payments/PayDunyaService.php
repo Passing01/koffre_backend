@@ -105,4 +105,23 @@ class PayDunyaService implements PaymentServiceInterface
 
         return (($data['status'] ?? '') === 'completed' || ($data['status'] ?? '') === 'success');
     }
+
+    public function payout(string $account, float $amount, string $description): bool
+    {
+        if ($this->isSimulation) {
+            Log::info('PayDunya payout SIMULATED', [
+                'account' => $account,
+                'amount' => $amount,
+                'description' => $description
+            ]);
+            return true;
+        }
+
+        // Implementation of PayDunya Disburse API would go here
+        // For now, if not simulation and not fully configured, return false or throw
+        // This is a placeholder since we are mainly in simulation for now
+
+        Log::warning('PayDunya payout called but not fully implemented for production.');
+        return false;
+    }
 }

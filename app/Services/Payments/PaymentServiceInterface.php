@@ -25,4 +25,12 @@ interface PaymentServiceInterface
      * @return bool
      */
     public function verifyPayment(string $paymentId): bool;
+
+    /**
+     * @param string $account (phone or bank account)
+     * @param float $amount
+     * @param string $description
+     * @return bool
+     */
+    public function payout(string $account, float $amount, string $description): bool;
 }

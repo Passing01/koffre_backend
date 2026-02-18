@@ -34,6 +34,7 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::get('/cagnottes/{id}', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'show'])->name('admin.cagnottes.show');
     Route::post('/cagnottes/{id}/approve-unlock', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'approveUnlock'])->name('admin.cagnottes.approve-unlock');
     Route::post('/cagnottes/{id}/reject-unlock', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'rejectUnlock'])->name('admin.cagnottes.reject-unlock');
+    Route::post('/cagnottes/{id}/process-payout', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'processPayout'])->name('admin.cagnottes.process-payout');
     Route::get('/transactions', [\App\Http\Controllers\Web\Admin\AdminTransactionController::class, 'index'])->name('admin.transactions.index');
 
     // Audit Logs
