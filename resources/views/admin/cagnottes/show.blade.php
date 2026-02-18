@@ -140,35 +140,44 @@
                         </div>
                     @else
                         @php
-                            $isEligible = $cagnotte->unlock_status === 'approved' && ($cagnotte->ends_at && $cagnotte->ends_at->isPast());
+                            $isApproved = $cagnotte->unlock_status === 'approved';
+                            $deadlineReached = ($cagnotte->ends_at && $cagnotte->ends_at->isPast());
+                            $isWaiting48h = $cagnotte->unlocked_at && $cagnotte->unlocked_at->isFuture();
                         @endphp
 
                         <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                             <div class="space-y-2">
-                                <p class="text-sm text-gray-600">Conditions de versement :</p>
+                                <p class="text-sm text-gray-600">Statut du versement :</p>
                                 <ul class="text-sm space-y-1">
-                                    <li class="flex items-center gap-2 {{ $cagnotte->unlock_status === 'approved' ? 'text-green-600 font-medium' : 'text-gray-400' }}">
-                                        <i class="fas fa-{{ $cagnotte->unlock_status === 'approved' ? 'check-circle' : 'circle' }}"></i>
+                                    <li class="flex items-center gap-2 {{ $isApproved ? 'text-green-600 font-medium' : 'text-gray-400' }}">
+                                        <i class="fas fa-{{ $isApproved ? 'check-circle' : 'circle' }}"></i>
                                         Déblocage approuvé
                                     </li>
-                                    <li class="flex items-center gap-2 {{ ($cagnotte->ends_at && $cagnotte->ends_at->isPast()) ? 'text-green-600 font-medium' : 'text-gray-400' }}">
-                                        <i class="fas fa-{{ ($cagnotte->ends_at && $cagnotte->ends_at->isPast()) ? 'check-circle' : 'circle' }}"></i>
-                                        Date limite atteinte ({{ $cagnotte->ends_at ? $cagnotte->ends_at->format('d/m/Y') : 'Non définie' }})
+                                    <li class="flex items-center gap-2 {{ $deadlineReached ? 'text-green-600 font-medium' : 'text-orange-500 font-medium' }}">
+                                        <i class="fas fa-{{ $deadlineReached ? 'check-circle' : 'exclamation-circle' }}"></i>
+                                        {{ $deadlineReached ? 'Date limite atteinte' : 'Date limite non atteinte (Transfert anticipé)' }}
                                     </li>
+                                    @if($isWaiting48h)
+                                    <li class="flex items-center gap-2 text-blue-600 font-medium">
+                                        <i class="fas fa-clock"></i>
+                                        Période de sécurité de 48h en cours (Bypass possible)
+                                    </li>
+                                    @endif
                                 </ul>
                             </div>
 
-                            @if($isEligible)
-                                <form action="{{ route('admin.cagnottes.process-payout', $cagnotte->id) }}" method="POST" onsubmit="return confirm('Confirmer le versement direct de {{ number_format($cagnotte->current_amount, 0, ',', ' ') }} FCFA au créateur ? Cette opération est irréversible.')">
+                            @if($isApproved)
+                                <form action="{{ route('admin.cagnottes.process-payout', $cagnotte->id) }}" method="POST" 
+                                    onsubmit="return confirm('{{ !$deadlineReached || $isWaiting48h ? 'ATTENTION : Les conditions standard (Délai/48h) ne sont pas encore remplies. Voulez-vous TOUT DE MÊME forcer le versement immédiat ?' : 'Confirmer le versement direct de ' . number_format($cagnotte->current_amount, 0, ',', ' ') . ' FCFA au créateur ?' }}')">
                                     @csrf
                                     <button type="submit" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center gap-3 transform hover:scale-105">
-                                        <i class="fas fa-money-bill-wave text-xl"></i>
-                                        Effectuer le versement
+                                        <i class="fas fa-bolt text-xl"></i>
+                                        Versement immédiat
                                     </button>
                                 </form>
                             @else
                                 <div class="px-6 py-3 bg-gray-50 border border-gray-100 rounded-xl text-gray-400 text-sm italic">
-                                    En attente des conditions d'éligibilité
+                                    Approuvez d'abord le déblocage
                                 </div>
                             @endif
                         </div>

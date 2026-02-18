@@ -351,10 +351,6 @@ class CagnotteService
             throw ValidationException::withMessages(['payout' => ['La demande de déblocage doit être approuvée avant le versement.']]);
         }
 
-        if ($cagnotte->ends_at && $cagnotte->ends_at->isFuture()) {
-            throw ValidationException::withMessages(['payout' => ['La date limite de la cagnotte n\'est pas encore atteinte.']]);
-        }
-
         if ($cagnotte->current_amount <= 0) {
             throw ValidationException::withMessages(['payout' => ['Le montant de la cagnotte est nul.']]);
         }
