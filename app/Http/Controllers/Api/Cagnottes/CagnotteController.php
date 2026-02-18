@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Cagnottes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cagnottes\AddParticipantRequest;
 use App\Http\Requests\Cagnottes\StoreCagnotteRequest;
+use App\Http\Requests\Cagnottes\UnlockCagnotteRequest;
 use App\Models\Cagnotte;
 use App\Services\Cagnottes\CagnotteService;
 use Illuminate\Http\JsonResponse;
@@ -74,6 +75,22 @@ class CagnotteController extends Controller
         return response()->json([
             'message' => 'Participant ajouté.',
             'data' => $participant,
+        ]);
+    }
+
+    public function requestUnlock(UnlockCagnotteRequest $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+
+        $cagnotte = $this->cagnotteService->requestUnlock(
+            cagnotteId: $id,
+            user: $user,
+            identityDocument: $request->file('identity_document'),
+        );
+
+        return response()->json([
+            'message' => 'Demande de déblocage envoyée. Traitement sous 48h ouvrables.',
+            'data' => $cagnotte,
         ]);
     }
 }

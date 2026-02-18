@@ -6,8 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Cagnotte;
 use Illuminate\Http\Request;
 
+use App\Services\Cagnottes\CagnotteService;
+
 class AdminCagnotteController extends Controller
 {
+    public function __construct(private readonly CagnotteService $cagnotteService)
+    {
+    }
+
     public function index(Request $request)
     {
         $query = Cagnotte::with(['user', 'contributions', 'participants']);
@@ -19,6 +25,10 @@ class AdminCagnotteController extends Controller
 
         if ($request->has('visibility') && $request->visibility !== '') {
             $query->where('visibility', $request->visibility);
+        }
+
+        if ($request->has('unlock_status') && $request->unlock_status !== '') {
+            $query->where('unlock_status', $request->unlock_status);
         }
 
         if ($request->has('search') && $request->search !== '') {
@@ -70,5 +80,26 @@ class AdminCagnotteController extends Controller
         ];
 
         return view('admin.cagnottes.show', compact('cagnotte', 'stats'));
+    }
+    public function approveUnlock(Request $request, int $id)
+    {
+        try {
+            $this->cagnotteService->approveUnlock($id, $request->user());
+            return back()->with('success', 'Demande de déblocage approuvée avec succès.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
+    public function rejectUnlock(Request $request, int $id)
+    {
+        $request->validate(['reason' => 'required|string']);
+
+        try {
+            $this->cagnotteService->rejectUnlock($id, $request->user(), $request->reason);
+            return back()->with('success', 'Demande de déblocage rejetée.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
     }
 }

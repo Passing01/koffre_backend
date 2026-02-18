@@ -47,6 +47,82 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left Column - Details -->
             <div class="lg:col-span-2 space-y-6">
+                @if($cagnotte->payout_mode === 'escrow')
+                <!-- Escrow Unlock Section -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 {{ $cagnotte->unlock_status === 'pending' ? 'border-orange-500' : ($cagnotte->unlock_status === 'approved' ? 'border-green-500' : ($cagnotte->unlock_status === 'rejected' ? 'border-red-500' : 'border-gray-200')) }}">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-lock-open text-orange-600"></i> Gestion du déblocage (Mode Coffre)
+                    </h3>
+                    
+                    <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-600">Statut actuel du déblocage</p>
+                            @php
+                                $statusClasses = [
+                                    'pending' => 'bg-yellow-100 text-yellow-700 border-yellow-200',
+                                    'approved' => 'bg-green-100 text-green-700 border-green-200',
+                                    'rejected' => 'bg-red-100 text-red-700 border-red-200',
+                                ];
+                                $statusLabel = [
+                                    'pending' => 'En attente de vérification',
+                                    'approved' => 'Approuvé',
+                                    'rejected' => 'Rejeté',
+                                ];
+                            @endphp
+                            
+                            @if($cagnotte->unlock_status)
+                                <div class="mt-1 flex items-center gap-3">
+                                    <span class="px-4 py-2 rounded-full text-sm font-bold border {{ $statusClasses[$cagnotte->unlock_status] }}">
+                                        {{ $statusLabel[$cagnotte->unlock_status] }}
+                                    </span>
+                                </div>
+                                <div class="mt-4 space-y-2">
+                                    @if($cagnotte->unlock_requested_at)
+                                        <p class="text-sm text-gray-600">
+                                            <i class="far fa-calendar-alt mr-1"></i> Demandé le : <span class="font-medium text-gray-900">{{ $cagnotte->unlock_requested_at->format('d/m/Y à H:i') }}</span>
+                                        </p>
+                                    @endif
+                                    @if($cagnotte->unlocked_at && $cagnotte->unlock_status === 'approved')
+                                        <p class="text-sm text-green-600 font-bold bg-green-50 p-3 rounded-lg border border-green-100 mt-3">
+                                            <i class="fas fa-clock mr-2"></i> Montant débloqué le : {{ $cagnotte->unlocked_at->format('d/m/Y à H:i') }}
+                                            <br><small class="text-xs font-normal text-green-500">(48h ouvrables à compter de l'approbation)</small>
+                                        </p>
+                                    @endif
+                                    @if($cagnotte->unlock_document_path)
+                                        <div class="mt-3">
+                                            <a href="{{ $cagnotte->unlock_document_url }}" target="_blank" class="inline-flex items-center px-4 py-2 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors border border-purple-100 font-semibold text-sm">
+                                                <i class="fas fa-id-card mr-2"></i> Consulter la pièce d'identité (KYC Déblocage)
+                                            </a>
+                                        </div>
+                                    @endif
+                                </div>
+                            @else
+                                <div class="mt-1">
+                                    <span class="px-4 py-2 rounded-full text-sm font-bold border bg-gray-100 text-gray-600 border-gray-200">
+                                        Aucune demande de déblocage effectuée
+                                    </span>
+                                </div>
+                            @endif
+                        </div>
+
+                        @if($cagnotte->unlock_status === 'pending')
+                        <div class="flex gap-3 flex-shrink-0">
+                            <form action="{{ route('admin.cagnottes.approve-unlock', $cagnotte->id) }}" method="POST" onsubmit="return confirm('Approuver cette demande ? L\'argent sera débloqué dans 48h ouvrables.')">
+                                @csrf
+                                <button type="submit" class="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-100 flex items-center">
+                                    <i class="fas fa-check mr-2"></i> Approuver
+                                </button>
+                            </form>
+                            
+                            <button onclick="openRejectModal()" class="bg-red-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-red-600 transition shadow-lg shadow-red-100 flex items-center">
+                                <i class="fas fa-times mr-2"></i> Rejeter
+                            </button>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+                @endif
+
                 <!-- Cagnotte Information -->
                 <div class="bg-white rounded-2xl shadow-lg p-6">
                     <h3 class="text-xl font-bold text-gray-900 mb-4">
@@ -260,4 +336,63 @@
             </div>
         </div>
     </div>
+    
+    @if($cagnotte->payout_mode === 'escrow')
+    <!-- Rejection Modal -->
+    <div id="rejectModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl transform transition-all duration-300">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-500">
+                    <i class="fas fa-exclamation-triangle text-xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">Motif du rejet</h3>
+            </div>
+            
+            <p class="text-gray-600 mb-6">Veuillez expliquer pourquoi vous rejetez cette demande de déblocage. Ce message sera transmis au créateur.</p>
+            
+            <form action="{{ route('admin.cagnottes.reject-unlock', $cagnotte->id) }}" method="POST">
+                @csrf
+                <textarea name="reason" rows="4" required 
+                    class="w-full rounded-2xl border-gray-200 focus:border-red-500 focus:ring-red-500 p-4 mb-6 transition-all" 
+                    placeholder="Ex: Document non conforme, photo illisible..."></textarea>
+                
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeRejectModal()" 
+                        class="flex-1 px-6 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+                        Annuler
+                    </button>
+                    <button type="submit" 
+                        class="flex-1 px-6 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 transition shadow-lg shadow-red-100">
+                        Confirmer le rejet
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    function openRejectModal() {
+        const modal = document.getElementById('rejectModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        // Add a small animation delay to content
+        setTimeout(() => {
+            modal.querySelector('div').classList.add('scale-100', 'opacity-100');
+        }, 10);
+    }
+    function closeRejectModal() {
+        const modal = document.getElementById('rejectModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+    
+    // Close on click outside
+    window.onclick = function(event) {
+        let modal = document.getElementById('rejectModal');
+        if (event.target == modal) {
+            closeRejectModal();
+        }
+    }
+    </script>
+    @endif
 @endsection

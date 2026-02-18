@@ -207,4 +207,127 @@ class CagnotteService
             return $participant;
         });
     }
+
+    public function requestUnlock(int $cagnotteId, User $user, $identityDocument): Cagnotte
+    {
+        $cagnotte = Cagnotte::query()->findOrFail($cagnotteId);
+
+        if ((int) $cagnotte->user_id !== (int) $user->id) {
+            throw ValidationException::withMessages([
+                'cagnotte_id' => ['Seul le créateur peut demander le déblocage.'],
+            ]);
+        }
+
+        if ($cagnotte->payout_mode !== 'escrow') {
+            throw ValidationException::withMessages([
+                'payout_mode' => ['Cette cagnotte n\'est pas en mode coffre.'],
+            ]);
+        }
+
+        if ($cagnotte->unlock_status === 'pending') {
+            throw ValidationException::withMessages([
+                'unlock_status' => ['Une demande de déblocage est déjà en cours.'],
+            ]);
+        }
+
+        if ($cagnotte->unlock_status === 'approved' || $cagnotte->unlocked_at) {
+            throw ValidationException::withMessages([
+                'unlock_status' => ['Cette cagnotte a déjà été débloquée.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($cagnotte, $user, $identityDocument) {
+            $path = $identityDocument->store('cagnottes/unlocks', 'public');
+
+            $cagnotte->update([
+                'unlock_requested_at' => now(),
+                'unlock_document_path' => $path,
+                'unlock_status' => 'pending',
+            ]);
+
+            $this->auditService->log(
+                action: 'cagnotte.unlock_requested',
+                actorUserId: $user->id,
+                auditableType: 'cagnotte',
+                auditableId: $cagnotte->id,
+                metadata: [
+                    'requested_at' => now()->toDateTimeString(),
+                ],
+            );
+
+            // TODO: Notifier les admins par email ou notification syst
+
+            return $cagnotte;
+        });
+    }
+
+    public function approveUnlock(int $cagnotteId, User $adminUser): Cagnotte
+    {
+        $cagnotte = Cagnotte::query()->findOrFail($cagnotteId);
+
+        if ($cagnotte->unlock_status !== 'pending') {
+            throw ValidationException::withMessages([
+                'unlock_status' => ['Aucune demande de déblocage en attente.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($cagnotte, $adminUser) {
+            // Déblocage 48h (2 jours ouvrables) après la DEMANDE
+            $releaseDate = $cagnotte->unlock_requested_at->copy()->addWeekdays(2);
+
+            // Si les 48h sont déjà passées, le déblocage est immédiat
+            $unlockedAt = $releaseDate->isPast() ? now() : $releaseDate;
+
+            $cagnotte->update([
+                'unlock_status' => 'approved',
+                'unlocked_at' => $unlockedAt,
+            ]);
+
+            $this->auditService->log(
+                action: 'cagnotte.unlock_approved',
+                actorUserId: $adminUser->id,
+                auditableType: 'cagnotte',
+                auditableId: $cagnotte->id,
+                metadata: [
+                    'unlocked_at' => $unlockedAt->toDateTimeString(),
+                ],
+            );
+
+            // TODO: Notification user
+
+            return $cagnotte;
+        });
+    }
+
+    public function rejectUnlock(int $cagnotteId, User $adminUser, string $reason): Cagnotte
+    {
+        $cagnotte = Cagnotte::query()->findOrFail($cagnotteId);
+
+        if ($cagnotte->unlock_status !== 'pending') {
+            throw ValidationException::withMessages([
+                'unlock_status' => ['Aucune demande de déblocage en attente.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($cagnotte, $adminUser, $reason) {
+            $cagnotte->update([
+                'unlock_status' => 'rejected',
+                'unlocked_at' => null,
+            ]);
+
+            $this->auditService->log(
+                action: 'cagnotte.unlock_rejected',
+                actorUserId: $adminUser->id,
+                auditableType: 'cagnotte',
+                auditableId: $cagnotte->id,
+                metadata: [
+                    'reason' => $reason,
+                ],
+            );
+
+            // TODO: Notification user
+
+            return $cagnotte;
+        });
+    }
 }

@@ -19,6 +19,7 @@ Route::prefix('cagnottes')->group(function () {
         Route::post('/', [CagnotteController::class, 'store']);
         Route::get('/{id}', [CagnotteController::class, 'show']);
         Route::post('/{id}/participants', [CagnotteController::class, 'addParticipant']);
+        Route::post('/{id}/unlock', [CagnotteController::class, 'requestUnlock']); // Demande de déblocage
         Route::get('/{id}/transactions', [CagnotteTransactionController::class, 'index']);
     });
 });

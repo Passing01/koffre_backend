@@ -36,6 +36,10 @@ class Cagnotte extends Model
         'ends_at',
         'status',
         'notified_admin_24h',
+        'unlock_requested_at',
+        'unlock_document_path',
+        'unlock_status',
+        'unlocked_at',
     ];
 
     protected $casts = [
@@ -44,6 +48,8 @@ class Cagnotte extends Model
         'payout_accounts' => 'array',
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
+        'unlock_requested_at' => 'datetime',
+        'unlocked_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -53,6 +59,7 @@ class Cagnotte extends Model
         'rccm_document_url',
         'ifu_document_url',
         'signed_contract_url',
+        'unlock_document_url',
     ];
 
     public function getProfilePhotoUrlAttribute(): ?string
@@ -83,6 +90,11 @@ class Cagnotte extends Model
     public function getSignedContractUrlAttribute(): ?string
     {
         return $this->signed_contract_path ? asset('storage/' . $this->signed_contract_path) : null;
+    }
+
+    public function getUnlockDocumentUrlAttribute(): ?string
+    {
+        return $this->unlock_document_path ? asset('storage/' . $this->unlock_document_path) : null;
     }
 
     public function user(): BelongsTo

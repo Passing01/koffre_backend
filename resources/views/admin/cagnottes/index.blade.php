@@ -14,43 +14,56 @@
 
         <!-- Filters -->
         <div class="bg-white rounded-2xl shadow-lg p-6">
-            <form method="GET" action="{{ route('admin.cagnottes.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <form method="GET" action="{{ route('admin.cagnottes.index') }}"
+                class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
-                    <input type="text" name="search" value="{{ request('search') }}"
-                        placeholder="Titre, description, créateur..."
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Titre, créateur..."
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
                     <select name="status"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
                         <option value="">Tous les statuts</option>
                         <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
                         <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>Complétée</option>
                         <option value="expired" {{ request('status') === 'expired' ? 'selected' : '' }}>Expirée</option>
-                        <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Annulée</option>
                     </select>
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Visibilité</label>
                     <select name="visibility"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
                         <option value="">Toutes</option>
                         <option value="public" {{ request('visibility') === 'public' ? 'selected' : '' }}>Publique</option>
                         <option value="private" {{ request('visibility') === 'private' ? 'selected' : '' }}>Privée</option>
                     </select>
                 </div>
 
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Déblocage (Coffre)</label>
+                    <select name="unlock_status"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
+                        <option value="">Tous</option>
+                        <option value="pending" {{ request('unlock_status') === 'pending' ? 'selected' : '' }}>En attente 🔑
+                        </option>
+                        <option value="approved" {{ request('unlock_status') === 'approved' ? 'selected' : '' }}>Approuvé ✅
+                        </option>
+                        <option value="rejected" {{ request('unlock_status') === 'rejected' ? 'selected' : '' }}>Rejeté ❌
+                        </option>
+                    </select>
+                </div>
+
                 <div class="flex items-end gap-2">
                     <button type="submit"
-                        class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all">
-                        <i class="fas fa-search"></i> Filtrer
+                        class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all text-sm font-bold">
+                        Filtrer
                     </button>
                     <a href="{{ route('admin.cagnottes.index') }}"
-                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all">
+                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all">
                         <i class="fas fa-redo"></i>
                     </a>
                 </div>
@@ -110,16 +123,22 @@
                                             <td class="px-6 py-4">
                                                 <span
                                                     class="px-3 py-1 text-xs font-semibold rounded-full
-                                                    {{ $cagnotte->status === 'active' ? 'bg-green-100 text-green-700' :
+                                                                                            {{ $cagnotte->status === 'active' ? 'bg-green-100 text-green-700' :
                             ($cagnotte->status === 'completed' ? 'bg-blue-100 text-blue-700' :
                                 ($cagnotte->status === 'expired' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')) }}">
                                                     {{ ucfirst($cagnotte->status) }}
                                                 </span>
+                                                @if($cagnotte->payout_mode === 'escrow' && $cagnotte->unlock_status === 'pending')
+                                                    <div
+                                                        class="mt-1 flex items-center gap-1 text-[10px] font-bold text-orange-600 animate-pulse">
+                                                        <i class="fas fa-key scale-75"></i> 🔑 ATTENTE DÉBLOCAGE
+                                                    </div>
+                                                @endif
                                             </td>
                                             <td class="px-6 py-4">
                                                 <span
                                                     class="px-3 py-1 text-xs font-semibold rounded-full
-                                                    {{ $cagnotte->visibility === 'public' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700' }}">
+                                                                                            {{ $cagnotte->visibility === 'public' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700' }}">
                                                     <i class="fas fa-{{ $cagnotte->visibility === 'public' ? 'globe' : 'lock' }}"></i>
                                                     {{ ucfirst($cagnotte->visibility) }}
                                                 </span>
