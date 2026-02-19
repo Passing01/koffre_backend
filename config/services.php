@@ -61,10 +61,16 @@ return [
     'geniuspay' => [
         'public_key' => env('GENIUSPAY_PUBLIC_KEY'),
         'secret_key' => env('GENIUSPAY_SECRET_KEY'),
+        'wallet_id' => env('GENIUSPAY_WALLET_ID'),
+        'base_url' => env('GENIUSPAY_BASE_URL', 'https://pay.genius.ci/api/v1/merchant'),
         'mode' => env('GENIUSPAY_MODE', 'test'),
         'simulation' => env('GENIUSPAY_SIMULATION', false),
     ],
 
     'default_gateway' => env('PAYMENT_GATEWAY', 'paydunya'),
+
+    'platform' => [
+        'commission_rate' => env('PLATFORM_COMMISSION_RATE', 0.01), // 1%
+    ],
 
 ];

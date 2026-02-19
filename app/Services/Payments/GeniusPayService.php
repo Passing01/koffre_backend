@@ -9,7 +9,8 @@ class GeniusPayService implements PaymentServiceInterface
 {
     private string $publicKey;
     private string $secretKey;
-    private string $baseUrl = "https://pay.genius.ci/api/v1/merchant";
+    private string $walletId;
+    private string $baseUrl;
     private bool $isSimulation;
     private ?string $defaultMethod;
 
@@ -17,6 +18,8 @@ class GeniusPayService implements PaymentServiceInterface
     {
         $this->publicKey = config('services.geniuspay.public_key') ?? '';
         $this->secretKey = config('services.geniuspay.secret_key') ?? '';
+        $this->walletId = config('services.geniuspay.wallet_id') ?? '';
+        $this->baseUrl = config('services.geniuspay.base_url', 'https://pay.genius.ci/api/v1/merchant');
         $this->isSimulation = config('services.geniuspay.simulation', false);
         $this->defaultMethod = $defaultMethod;
     }
@@ -146,6 +149,7 @@ class GeniusPayService implements PaymentServiceInterface
 
         $response = Http::withToken($this->secretKey)
             ->post("{$this->baseUrl}/payouts", [
+                'wallet_id' => $this->walletId,
                 'amount' => (int) $amount,
                 'currency' => 'XOF',
                 'description' => $description,
@@ -158,7 +162,7 @@ class GeniusPayService implements PaymentServiceInterface
                     'name' => 'Kofre User',
                     'phone' => $account,
                 ],
-                'idempotency_key' => 'payout_' . time() . '_' . $account,
+                'idempotency_key' => 'payout_' . md5($account . $amount . $description . time()),
             ]);
 
         if ($response->failed()) {

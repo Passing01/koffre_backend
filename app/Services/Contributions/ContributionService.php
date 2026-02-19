@@ -10,6 +10,7 @@ use App\Services\Audit\AuditService;
 use App\Services\Notifications\FcmService;
 use App\Services\Payments\PaymentServiceInterface;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -156,6 +157,33 @@ class ContributionService
                             "La cagnotte '{$cagnotte->title}' à laquelle vous avez contribué a atteint son objectif !"
                         );
                     }
+                }
+            }
+
+            // Trigger automatic payout if in direct mode
+            if ($cagnotte->payout_mode === 'direct') {
+                $commissionRate = config('services.platform.commission_rate', 0.01);
+                $commission = $contribution->amount * $commissionRate;
+                $netAmount = $contribution->amount - $commission;
+
+                $payoutAccount = $cagnotte->payout_account ?? $cagnotte->user->phone;
+
+                try {
+                    $payoutSuccess = $this->paymentService->payout(
+                        account: $payoutAccount,
+                        amount: (float) $netAmount,
+                        description: "Versement automatique Koffre - Contrib #{$contribution->id}",
+                        method: $cagnotte->payout_method
+                    );
+
+                    if ($payoutSuccess) {
+                        Log::info("Automatic payout successful for contribution #{$contribution->id}");
+                        // We could mark the contribution or a separate payout record as "disbursed"
+                    } else {
+                        Log::error("Automatic payout failed for contribution #{$contribution->id}");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("Error during automatic payout for contribution #{$contribution->id}: " . $e->getMessage());
                 }
             }
 

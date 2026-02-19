@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Services\Audit\AuditService;
 use App\Services\Notifications\FcmService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -359,10 +361,15 @@ class CagnotteService
             // Use the primary payout account if available, otherwise fallback to user's phone
             $payoutAccount = $cagnotte->payout_account ?? $cagnotte->user->phone;
 
+            // Calculate net amount (deduct commission)
+            $commissionRate = config('services.platform.commission_rate', 0.01);
+            $commission = $cagnotte->current_amount * $commissionRate;
+            $netAmount = $cagnotte->current_amount - $commission;
+
             // Call the payment service payout
             $success = $this->paymentService->payout(
                 account: $payoutAccount,
-                amount: (float) $cagnotte->current_amount,
+                amount: (float) $netAmount,
                 description: "Versement Koffre - Cagnotte #{$cagnotte->id}: {$cagnotte->title}",
                 method: $cagnotte->payout_method
             );
