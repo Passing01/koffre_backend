@@ -35,3 +35,4 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::post('/payments/webhook', [\App\Http\Controllers\Api\Payments\PaymentWebhookController::class, 'handleCinetPay']);
 Route::post('/payments/fedapay/webhook', [\App\Http\Controllers\Api\Payments\PaymentWebhookController::class, 'handleFedaPay']);
 Route::post('/payments/paydunya/webhook', [\App\Http\Controllers\Api\Payments\PaymentWebhookController::class, 'handlePayDunya']);
+Route::post('/payments/geniuspay/webhook', [\App\Http\Controllers\Api\Payments\PaymentWebhookController::class, 'handleGeniusPay']);

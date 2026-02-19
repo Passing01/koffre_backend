@@ -16,7 +16,15 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(
             \App\Services\Payments\PaymentServiceInterface::class,
-            \App\Services\Payments\PayDunyaService::class
+            function ($app) {
+                $gateway = config('services.default_gateway');
+                return match ($gateway) {
+                    'fedapay' => new \App\Services\Payments\FedaPayService(),
+                    'cinetpay' => new \App\Services\Payments\GeniusPayService('cinetpay'),
+                    'geniuspay' => new \App\Services\Payments\GeniusPayService(),
+                    default => new \App\Services\Payments\PayDunyaService(),
+                };
+            }
         );
     }
 

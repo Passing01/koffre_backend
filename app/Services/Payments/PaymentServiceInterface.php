@@ -30,7 +30,8 @@ interface PaymentServiceInterface
      * @param string $account (phone or bank account)
      * @param float $amount
      * @param string $description
+     * @param string|null $method
      * @return bool
      */
-    public function payout(string $account, float $amount, string $description): bool;
+    public function payout(string $account, float $amount, string $description, ?string $method = null): bool;
 }

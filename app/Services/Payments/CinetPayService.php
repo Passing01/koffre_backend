@@ -82,4 +82,10 @@ class CinetPayService implements PaymentServiceInterface
 
         return ($data['code'] === '00' || $data['message'] === 'SUCCES');
     }
+
+    public function payout(string $account, float $amount, string $description, ?string $method = null): bool
+    {
+        Log::warning('CinetPay payout called but not implemented.');
+        return false;
+    }
 }

@@ -45,7 +45,7 @@ class ContributionService
                 'amount' => $amount,
                 'payment_reference' => $reference,
                 'payment_status' => 'pending',
-                'payment_method' => $paymentMethod ?? 'CinetPay',
+                'payment_method' => $paymentMethod ?? config('services.default_gateway'),
             ]);
 
             $paymentData = $this->paymentService->initiatePayment(

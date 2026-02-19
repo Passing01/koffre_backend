@@ -106,7 +106,7 @@ class PayDunyaService implements PaymentServiceInterface
         return (($data['status'] ?? '') === 'completed' || ($data['status'] ?? '') === 'success');
     }
 
-    public function payout(string $account, float $amount, string $description): bool
+    public function payout(string $account, float $amount, string $description, ?string $method = null): bool
     {
         if ($this->isSimulation) {
             Log::info('PayDunya payout SIMULATED', [

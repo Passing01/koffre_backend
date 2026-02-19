@@ -106,4 +106,38 @@ class PaymentWebhookController extends Controller
 
         return response()->json(['message' => 'Notification received']);
     }
+
+    public function handleGeniusPay(Request $request)
+    {
+        Log::info('GeniusPay Webhook Received', $request->all());
+
+        $signature = $request->header('X-GeniusPay-Signature');
+        $payload = $request->getContent();
+
+        // Verification of signature could be added here if secret is known
+        // For now, we trust the reference and re-verify via API if needed
+
+        $data = $request->input('data', []);
+        $reference = $data['reference'] ?? null;
+        $status = $data['status'] ?? null;
+
+        if (!$reference) {
+            return response()->json(['message' => 'Reference missing'], 400);
+        }
+
+        if (in_array($status, ['completed', 'success', 'paid'])) {
+            try {
+                // Re-verify for security
+                if ($this->paymentService->verifyPayment($reference)) {
+                    $this->contributionService->complete($reference);
+                    return response()->json(['message' => 'GeniusPay payment completed']);
+                }
+            } catch (\Exception $e) {
+                Log::error('GeniusPay webhook processing error', ['error' => $e->getMessage()]);
+                return response()->json(['message' => 'Error'], 500);
+            }
+        }
+
+        return response()->json(['message' => 'Notification received']);
+    }
 }

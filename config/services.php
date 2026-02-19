@@ -58,4 +58,13 @@ return [
         'simulation' => env('PAYDUNYA_SIMULATION', false),
     ],
 
+    'geniuspay' => [
+        'public_key' => env('GENIUSPAY_PUBLIC_KEY'),
+        'secret_key' => env('GENIUSPAY_SECRET_KEY'),
+        'mode' => env('GENIUSPAY_MODE', 'test'),
+        'simulation' => env('GENIUSPAY_SIMULATION', false),
+    ],
+
+    'default_gateway' => env('PAYMENT_GATEWAY', 'paydunya'),
+
 ];

@@ -363,7 +363,8 @@ class CagnotteService
             $success = $this->paymentService->payout(
                 account: $payoutAccount,
                 amount: (float) $cagnotte->current_amount,
-                description: "Versement Koffre - Cagnotte #{$cagnotte->id}: {$cagnotte->title}"
+                description: "Versement Koffre - Cagnotte #{$cagnotte->id}: {$cagnotte->title}",
+                method: $cagnotte->payout_method
             );
 
             if (!$success) {

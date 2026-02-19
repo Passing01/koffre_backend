@@ -100,4 +100,10 @@ class FedaPayService implements PaymentServiceInterface
         // FedaPay status 'approved' usually means successful
         return $data['status'] === 'approved' || $data['status'] === 'transferred';
     }
+
+    public function payout(string $account, float $amount, string $description, ?string $method = null): bool
+    {
+        Log::warning('FedaPay payout called but not implemented.');
+        return false;
+    }
 }
