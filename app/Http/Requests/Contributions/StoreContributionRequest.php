@@ -17,6 +17,7 @@ class StoreContributionRequest extends FormRequest
             'cagnotte_id' => ['required', 'integer', 'exists:cagnottes,id'],
             'amount' => ['required', 'numeric', 'min:100'], // CinetPay minimum standard
             'contributor_name' => ['nullable', 'string', 'max:255'],
+            'payment_method' => ['nullable', 'string'],
         ];
     }
 }

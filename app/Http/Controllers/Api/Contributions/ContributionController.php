@@ -25,6 +25,7 @@ class ContributionController extends Controller
             amount: (float) $request->input('amount'),
             actor: $actor,
             contributorName: $request->string('contributor_name')->toString() ?: null,
+            paymentMethod: $request->string('payment_method')->toString() ?: null,
         );
 
         return response()->json([
