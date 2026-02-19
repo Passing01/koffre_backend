@@ -15,7 +15,7 @@ class StoreContributionRequest extends FormRequest
     {
         return [
             'cagnotte_id' => ['required', 'integer', 'exists:cagnottes,id'],
-            'amount' => ['required', 'numeric', 'min:100'], // CinetPay minimum standard
+            'amount' => ['required', 'numeric', 'min:200'], // GeniusPay minimum standard is 200
             'contributor_name' => ['nullable', 'string', 'max:255'],
             'payment_method' => ['nullable', 'string'],
         ];
