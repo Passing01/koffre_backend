@@ -41,6 +41,7 @@ class Cagnotte extends Model
         'unlock_status',
         'unlocked_at',
         'payout_processed_at',
+        'is_archived',
     ];
 
     protected $casts = [
@@ -52,6 +53,7 @@ class Cagnotte extends Model
         'unlock_requested_at' => 'datetime',
         'unlocked_at' => 'datetime',
         'payout_processed_at' => 'datetime',
+        'is_archived' => 'boolean',
     ];
 
     protected $appends = [

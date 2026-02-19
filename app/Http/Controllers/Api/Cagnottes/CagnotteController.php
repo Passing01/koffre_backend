@@ -93,4 +93,20 @@ class CagnotteController extends Controller
             'data' => $cagnotte,
         ]);
     }
+
+    public function archive(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $cagnotte = Cagnotte::query()
+            ->where('id', $id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $cagnotte->update(['is_archived' => true]);
+
+        return response()->json([
+            'message' => 'Cagnotte archivée avec succès.',
+            'data' => $cagnotte,
+        ]);
+    }
 }
