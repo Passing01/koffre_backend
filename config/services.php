@@ -67,7 +67,7 @@ return [
         'simulation' => env('GENIUSPAY_SIMULATION', false),
     ],
 
-    'default_gateway' => env('PAYMENT_GATEWAY', 'paydunya'),
+    'default_gateway' => env('PAYMENT_GATEWAY', 'geniuspay') ?: 'geniuspay',
 
     'platform' => [
         'commission_rate' => env('PLATFORM_COMMISSION_RATE', 0.01), // 1%

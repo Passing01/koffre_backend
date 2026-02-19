@@ -22,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
                     'fedapay' => new \App\Services\Payments\FedaPayService(),
                     'cinetpay' => new \App\Services\Payments\GeniusPayService('cinetpay'),
                     'geniuspay' => new \App\Services\Payments\GeniusPayService(),
-                    default => new \App\Services\Payments\PayDunyaService(),
+                    default => new \App\Services\Payments\GeniusPayService(),
                 };
             }
         );
