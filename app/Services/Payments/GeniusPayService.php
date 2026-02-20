@@ -57,9 +57,12 @@ class GeniusPayService implements PaymentServiceInterface
                     'amount' => (int) $amount,
                     'currency' => $currency,
                     'description' => $description,
-                    'success_url' => url('/payments/success'),
-                    'error_url' => url('/payments/cancel'),
+                    'success_url' => url('/payments/success?token=' . $transactionId),
+                    'cancel_url' => url('/payments/cancel'),
                     'callback_url' => url('/api/payments/geniuspay/webhook'),
+                    'redirect_url' => url('/payments/success?token=' . $transactionId), // Alias de sécurité
+                    'return_url' => url('/payments/success?token=' . $transactionId),   // Alias classique
+                    'notify_url' => url('/api/payments/geniuspay/webhook'),            // Alias classique
                     'customer' => [
                         'name' => $customer['name'] ?? 'Kofre User',
                         'email' => $customer['email'] ?? 'user@kofre.com',
