@@ -12,7 +12,49 @@
             </a>
             <div>
                 <h2 class="text-3xl font-bold text-gray-900">{{ $cagnotte->title }}</h2>
-                <p class="text-gray-600 mt-1">Cagnotte #{{ $cagnotte->id }}</p>
+                <div class="flex items-center gap-2 mt-1">
+                    <p class="text-gray-600">Cagnotte #{{ $cagnotte->id }}</p>
+                    <span class="px-2 py-0.5 rounded text-xs font-bold uppercase
+                        {{ $cagnotte->status === 'active' ? 'bg-green-100 text-green-700' : 
+                           ($cagnotte->status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 
+                           ($cagnotte->status === 'blocked' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700')) }}">
+                        {{ $cagnotte->status }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Moderation Banner -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 {{ $cagnotte->status === 'blocked' ? 'border-red-500' : ($cagnotte->status === 'pending' ? 'border-yellow-500' : 'border-green-500') }}">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-900">Modération App</h3>
+                    <p class="text-gray-600 text-sm">Contrôlez la visibilité de cette cagnotte sur la plateforme.</p>
+                    @if($cagnotte->status === 'blocked')
+                        <div class="mt-2 p-3 bg-red-50 border border-red-100 rounded-lg">
+                            <p class="text-red-700 text-sm font-bold">Motif du blocage :</p>
+                            <p class="text-red-600 text-sm">{{ $cagnotte->moderation_reason }}</p>
+                            <p class="text-red-400 text-xs mt-1">Bloqué le {{ $cagnotte->blocked_at ? $cagnotte->blocked_at->format('d/m/Y à H:i') : 'N/A' }}</p>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="flex gap-3">
+                    @if($cagnotte->status === 'pending' || $cagnotte->status === 'blocked')
+                        <form action="{{ route('admin.cagnottes.activate', $cagnotte->id) }}" method="POST" onsubmit="return confirm('Activer/Rétablir cette cagnotte ?')">
+                            @csrf
+                            <button type="submit" class="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-100 flex items-center">
+                                <i class="fas fa-check-circle mr-2"></i> Activer la cagnotte
+                            </button>
+                        </form>
+                    @endif
+                    
+                    @if($cagnotte->status !== 'blocked')
+                        <button onclick="openBlockModal()" class="bg-red-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-red-600 transition shadow-lg shadow-red-100 flex items-center">
+                            <i class="fas fa-ban mr-2"></i> Bloquer / Censurer
+                        </button>
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -309,6 +351,56 @@
                         @endforelse
                     </div>
                 </div>
+
+                <!-- Comments Moderation -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-comments text-pink-600"></i> Modération des Commentaires
+                        ({{ $cagnotte->comments->count() }})
+                    </h3>
+                    <div class="space-y-4 max-h-[600px] overflow-y-auto">
+                        @forelse($cagnotte->comments as $comment)
+                            <div class="p-4 bg-gray-50 rounded-xl border {{ $comment->is_blocked ? 'border-red-200 bg-red-50' : 'border-gray-100' }}">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2">
+                                            <p class="font-bold text-gray-900">{{ $comment->author_name }}</p>
+                                            <span class="text-xs text-gray-400">{{ $comment->created_at->format('d/m/Y H:i') }}</span>
+                                            @if($comment->is_blocked)
+                                                <span class="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase">Censuré</span>
+                                            @endif
+                                        </div>
+                                        <p class="text-sm text-gray-700 mt-1">{{ $comment->body }}</p>
+                                        
+                                        @if($comment->replies->count() > 0)
+                                            <div class="mt-3 ml-6 space-y-2 border-l-2 border-gray-200 pl-4">
+                                                @foreach($comment->replies as $reply)
+                                                    <div class="text-xs">
+                                                        <div class="flex items-center gap-2">
+                                                            <strong class="text-gray-900">{{ $reply->author_name }}</strong>
+                                                            @if($reply->is_blocked)
+                                                                <span class="text-red-500 font-bold">[Censuré]</span>
+                                                            @endif
+                                                        </div>
+                                                        <p class="text-gray-600">{{ $reply->body }}</p>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                    
+                                    @if(!$comment->is_blocked)
+                                        <button onclick="openBlockCommentModal({{ $comment->id }})" class="text-red-500 hover:text-red-700 p-2" title="Censurer ce commentaire">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-gray-500 text-center py-8">Aucun commentaire</p>
+                        @endforelse
+                    </div>
+                </div>
             </div>
 
             <!-- Right Column - Creator & Participants -->
@@ -348,7 +440,7 @@
                 </div>
 
                 <!-- KYC Documents (if applicable) -->
-                @if($cagnotte->creator_type === 'person' || $cagnotte->creator_type === 'company')
+                @if($cagnotte->creator_type === 'physique' || $cagnotte->creator_type === 'morale')
                     <div class="bg-white rounded-2xl shadow-lg p-6">
                         <h3 class="text-xl font-bold text-gray-900 mb-4">
                             <i class="fas fa-file-alt text-yellow-600"></i> Documents KYC
@@ -372,7 +464,7 @@
                                     <i class="fas fa-file-contract text-purple-600"></i> Contrat signé
                                 </a>
                             @endif
-                            @if($cagnotte->creator_type === 'company')
+                            @if($cagnotte->creator_type === 'morale')
                                 @if($cagnotte->company_logo_path)
                                     <a href="{{ $cagnotte->company_logo_url }}" target="_blank"
                                         class="block p-2 bg-gray-50 rounded hover:bg-gray-100 transition-all">
@@ -392,6 +484,12 @@
                                     </a>
                                 @endif
                             @endif
+                            @if($cagnotte->background_image_path)
+                                <a href="{{ $cagnotte->background_image_url }}" target="_blank"
+                                    class="block p-2 bg-gray-50 rounded hover:bg-gray-100 transition-all">
+                                    <i class="fas fa-image text-pink-600"></i> Image de fond
+                                </a>
+                            @endif
                         </div>
                     </div>
                 @endif
@@ -400,14 +498,14 @@
     </div>
     
     @if($cagnotte->payout_mode === 'escrow')
-    <!-- Rejection Modal -->
+    <!-- Rejection Modal (KYC) -->
     <div id="rejectModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl transform transition-all duration-300">
             <div class="flex items-center gap-3 mb-6">
                 <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-500">
                     <i class="fas fa-exclamation-triangle text-xl"></i>
                 </div>
-                <h3 class="text-2xl font-bold text-gray-900">Motif du rejet</h3>
+                <h3 class="text-2xl font-bold text-gray-900">Motif du rejet (KYC)</h3>
             </div>
             
             <p class="text-gray-600 mb-6">Veuillez expliquer pourquoi vous rejetez cette demande de déblocage. Ce message sera transmis au créateur.</p>
@@ -431,30 +529,79 @@
             </form>
         </div>
     </div>
+    @endif
+
+    <!-- Block Cagnotte Modal -->
+    <div id="blockCagnotteModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-500">
+                    <i class="fas fa-ban text-xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">Censurer la Cagnotte</h3>
+            </div>
+            <p class="text-gray-600 mb-6">En bloquant cette cagnotte, elle ne sera plus visible publiquement et les contributions seront suspendues.</p>
+            <form action="{{ route('admin.cagnottes.block', $cagnotte->id) }}" method="POST">
+                @csrf
+                <textarea name="reason" rows="3" required class="w-full rounded-2xl border-gray-200 p-4 mb-6" placeholder="Motif du blocage (ex: Contenu illicite, Fraude...)"></textarea>
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeBlockModal()" class="flex-1 px-6 py-3 rounded-xl font-bold bg-gray-100">Annuler</button>
+                    <button type="submit" class="flex-1 px-6 py-3 rounded-xl font-bold text-white bg-red-600 shadow-lg shadow-red-100">Bloquer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Block Comment Modal -->
+    <div id="blockCommentModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl">
+            <h3 class="text-2xl font-bold text-gray-900 mb-4">Censurer le commentaire</h3>
+            <p class="text-gray-600 mb-6">Le commentaire sera masqué mais conservé en base.</p>
+            <form id="blockCommentForm" method="POST">
+                @csrf
+                <textarea name="reason" rows="2" class="w-full rounded-2xl border-gray-200 p-4 mb-6" placeholder="Raison optionnelle..."></textarea>
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeBlockCommentModal()" class="flex-1 px-6 py-3 rounded-xl font-bold bg-gray-100">Annuler</button>
+                    <button type="submit" class="flex-1 px-6 py-3 rounded-xl font-bold text-white bg-red-600">Censurer</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script>
     function openRejectModal() {
-        const modal = document.getElementById('rejectModal');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        // Add a small animation delay to content
-        setTimeout(() => {
-            modal.querySelector('div').classList.add('scale-100', 'opacity-100');
-        }, 10);
+        document.getElementById('rejectModal').classList.remove('hidden');
+        document.getElementById('rejectModal').classList.add('flex');
     }
     function closeRejectModal() {
-        const modal = document.getElementById('rejectModal');
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+        document.getElementById('rejectModal').classList.add('hidden');
+    }
+
+    function openBlockModal() {
+        document.getElementById('blockCagnotteModal').classList.remove('hidden');
+        document.getElementById('blockCagnotteModal').classList.add('flex');
+    }
+    function closeBlockModal() {
+        document.getElementById('blockCagnotteModal').classList.add('hidden');
+    }
+
+    function openBlockCommentModal(commentId) {
+        const form = document.getElementById('blockCommentForm');
+        form.action = `/admin/cagnottes/{{ $cagnotte->id }}/comments/${commentId}/block`;
+        document.getElementById('blockCommentModal').classList.remove('hidden');
+        document.getElementById('blockCommentModal').classList.add('flex');
+    }
+    function closeBlockCommentModal() {
+        document.getElementById('blockCommentModal').classList.add('hidden');
     }
     
     // Close on click outside
     window.onclick = function(event) {
-        let modal = document.getElementById('rejectModal');
-        if (event.target == modal) {
+        if (event.target.classList.contains('bg-black/60')) {
             closeRejectModal();
+            closeBlockModal();
+            closeBlockCommentModal();
         }
     }
     </script>
-    @endif
 @endsection

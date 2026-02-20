@@ -53,14 +53,17 @@ class StoreCagnotteRequest extends FormRequest
                 'mimes:pdf',
                 'max:10240',
                 function ($attribute, $value, $fail) {
-                    if ($this->target_amount > 10000000 && !$value) {
-                        $fail('Le contrat signé est obligatoire pour un objectif supérieur à 10.000.000.');
+                    if ($this->target_amount >= 10000000 && !$value) {
+                        $fail('Le contrat signé est obligatoire pour un objectif supérieur ou égal à 10.000.000.');
                     }
                 }
             ],
 
             'participants' => ['nullable', 'array'],
             'participants.*' => ['required', 'string'],
+
+            // Image de fond de la cagnotte
+            'background_image' => ['nullable', 'file', 'image', 'max:5120'],
         ];
     }
 }

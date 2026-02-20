@@ -29,7 +29,7 @@ class CagnotteService
     {
         return Cagnotte::query()
             ->where('visibility', 'public')
-            ->whereIn('status', ['active', 'closed'])
+            ->where('status', 'active')
             ->orderByDesc('id')
             ->get();
     }
@@ -75,6 +75,12 @@ class CagnotteService
                 $data['signed_contract_path'] = $data['signed_contract']->store('cagnottes/contracts', 'public');
                 unset($data['signed_contract']);
             }
+            if (isset($data['background_image'])) {
+                $data['background_image_path'] = $data['background_image']->store('cagnottes/backgrounds', 'public');
+                unset($data['background_image']);
+            }
+
+            $data['status'] = 'pending';
 
             $cagnotte = Cagnotte::query()->create($data);
 
@@ -106,6 +112,37 @@ class CagnotteService
             );
 
             return $cagnotte;
+        });
+    }
+
+    public function updateCagnotte(int $cagnotteId, User $user, array $data): Cagnotte
+    {
+        $cagnotte = Cagnotte::query()->findOrFail($cagnotteId);
+
+        if ((int) $cagnotte->user_id !== (int) $user->id) {
+            throw ValidationException::withMessages([
+                'cagnotte_id' => ['Seul le créateur peut modifier cette cagnotte.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($cagnotte, $user, $data) {
+            // Handle background image upload
+            if (isset($data['background_image'])) {
+                $data['background_image_path'] = $data['background_image']->store('cagnottes/backgrounds', 'public');
+                unset($data['background_image']);
+            }
+
+            $cagnotte->update($data);
+
+            $this->auditService->log(
+                action: 'cagnotte.updated',
+                actorUserId: $user->id,
+                auditableType: 'cagnotte',
+                auditableId: $cagnotte->id,
+                metadata: array_keys($data),
+            );
+
+            return $cagnotte->fresh();
         });
     }
 

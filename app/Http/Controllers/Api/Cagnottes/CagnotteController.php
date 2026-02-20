@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Cagnottes\AddParticipantRequest;
 use App\Http\Requests\Cagnottes\StoreCagnotteRequest;
 use App\Http\Requests\Cagnottes\UnlockCagnotteRequest;
+use App\Http\Requests\Cagnottes\UpdateCagnotteRequest;
 use App\Models\Cagnotte;
 use App\Services\Cagnottes\CagnotteService;
 use Illuminate\Http\JsonResponse;
@@ -106,6 +107,18 @@ class CagnotteController extends Controller
 
         return response()->json([
             'message' => 'Cagnotte archivée avec succès.',
+            'data' => $cagnotte,
+        ]);
+    }
+
+    public function update(UpdateCagnotteRequest $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+
+        $cagnotte = $this->cagnotteService->updateCagnotte($id, $user, $request->validated());
+
+        return response()->json([
+            'message' => 'Cagnotte mise à jour.',
             'data' => $cagnotte,
         ]);
     }

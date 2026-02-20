@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Carbon\Carbon;
 
 class Cagnotte extends Model
 {
@@ -27,6 +28,7 @@ class Cagnotte extends Model
         'identity_document_path',
         'business_name',
         'company_logo_path',
+        'background_image_path',
         'rccm_number',
         'ifu_number',
         'rccm_document_path',
@@ -42,6 +44,8 @@ class Cagnotte extends Model
         'unlocked_at',
         'payout_processed_at',
         'is_archived',
+        'moderation_reason',
+        'blocked_at',
     ];
 
     protected $casts = [
@@ -60,10 +64,12 @@ class Cagnotte extends Model
         'profile_photo_url',
         'identity_document_url',
         'company_logo_url',
+        'background_image_url',
         'rccm_document_url',
         'ifu_document_url',
         'signed_contract_url',
         'unlock_document_url',
+        'stats',
     ];
 
     public function getProfilePhotoUrlAttribute(): ?string
@@ -101,6 +107,54 @@ class Cagnotte extends Model
         return $this->unlock_document_path ? asset('storage/' . $this->unlock_document_path) : null;
     }
 
+    public function getBackgroundImageUrlAttribute(): ?string
+    {
+        return $this->background_image_path ? asset('storage/' . $this->background_image_path) : null;
+    }
+
+    public function getStatsAttribute(): array
+    {
+        $start = $this->starts_at ?? $this->created_at;
+        $end = $this->ends_at;
+        $now = Carbon::now();
+
+        // Durée de la cagnotte
+        if ($end) {
+            $totalSeconds = $start->diffInSeconds($end);
+            $elapsedSeconds = $start->diffInSeconds($now->lessThan($end) ? $now : $end);
+            $remainingSeconds = max(0, $now->diffInSeconds($end, false));
+        } else {
+            $totalSeconds = $start->diffInSeconds($now);
+            $elapsedSeconds = $totalSeconds;
+            $remainingSeconds = 0;
+        }
+
+        // Format durée restante
+        $remainingDays = intdiv($remainingSeconds, 86400);
+        $remainingHours = intdiv($remainingSeconds % 86400, 3600);
+
+        // Format durée totale
+        $totalDays = intdiv($totalSeconds, 86400);
+        $totalHours = intdiv($totalSeconds % 86400, 3600);
+
+        // Compteurs
+        $likesCount = $this->likes()->count();
+        $commentsCount = $this->comments()->count();
+        $contributorsCount = $this->contributions()->where('payment_status', 'success')->distinct('user_id')->count('user_id');
+
+        return [
+            'duration_days' => $totalDays,
+            'duration_hours' => $totalHours,
+            'remaining_days' => $remainingDays,
+            'remaining_hours' => $remainingHours,
+            'is_expired' => $end ? $now->greaterThan($end) : false,
+            'likes_count' => $likesCount,
+            'comments_count' => $commentsCount,
+            'contributors_count' => $contributorsCount,
+            'started_at_human' => $start->diffForHumans(),
+        ];
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -119,5 +173,28 @@ class Cagnotte extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
+    }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(CagnotteComment::class)
+            ->whereNull('parent_id')
+            ->where('is_blocked', false)
+            ->with([
+                'user:id,fullname,phone',
+                'replies' => function ($q) {
+                    $q->where('is_blocked', false);
+                }
+            ]);
+    }
+
+    public function allComments(): HasMany
+    {
+        return $this->hasMany(CagnotteComment::class);
+    }
+
+    public function likes(): HasMany
+    {
+        return $this->hasMany(CagnotteLike::class);
     }
 }

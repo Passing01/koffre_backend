@@ -64,7 +64,13 @@ class AdminCagnotteController extends Controller
             'contributions.user',
             'transactions' => function ($query) {
                 $query->orderBy('created_at', 'desc');
-            }
+            },
+            'comments' => function ($query) {
+                $query->orderBy('created_at', 'desc');
+            },
+            'comments.user',
+            'comments.replies',
+            'comments.replies.user'
         ])->findOrFail($id);
 
         // Statistiques de la cagnotte
@@ -111,5 +117,46 @@ class AdminCagnotteController extends Controller
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
+    }
+
+    public function activate(int $id)
+    {
+        $cagnotte = Cagnotte::findOrFail($id);
+        $cagnotte->update([
+            'status' => 'active',
+            'blocked_at' => null,
+            'moderation_reason' => null
+        ]);
+
+        return back()->with('success', 'Cagnotte activée avec succès.');
+    }
+
+    public function block(Request $request, int $id)
+    {
+        $request->validate(['reason' => 'required|string']);
+
+        $cagnotte = Cagnotte::findOrFail($id);
+        $cagnotte->update([
+            'status' => 'blocked',
+            'blocked_at' => now(),
+            'moderation_reason' => $request->reason
+        ]);
+
+        // TODO: Envoyer notification au créateur avec le motif
+
+        return back()->with('success', 'Cagnotte bloquée/censurée.');
+    }
+
+    public function blockComment(Request $request, int $id, int $commentId)
+    {
+        $request->validate(['reason' => 'nullable|string']);
+
+        $comment = \App\Models\CagnotteComment::where('cagnotte_id', $id)->findOrFail($commentId);
+        $comment->update([
+            'is_blocked' => true,
+            'moderation_reason' => $request->reason
+        ]);
+
+        return back()->with('success', 'Commentaire censuré.');
     }
 }

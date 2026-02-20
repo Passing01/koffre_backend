@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Auth\OtpAuthController;
 use App\Http\Controllers\Api\Cagnottes\CagnotteController;
+use App\Http\Controllers\Api\Cagnottes\CagnotteInteractionController;
 use App\Http\Controllers\Api\Cagnottes\CagnotteTransactionController;
 use App\Http\Controllers\Api\Contributions\ContributionController;
 use Illuminate\Support\Facades\Route;
@@ -15,13 +16,25 @@ Route::prefix('auth')->group(function () {
 Route::prefix('cagnottes')->group(function () {
     Route::get('/publiques', [CagnotteController::class, 'publics']);
 
+    // Commentaires publics (lecture sans auth)
+    Route::get('/{id}/comments', [CagnotteInteractionController::class, 'listComments']);
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [CagnotteController::class, 'store']);
         Route::get('/{id}', [CagnotteController::class, 'show']);
+        Route::put('/{id}', [CagnotteController::class, 'update']);              // Modifier la cagnotte
         Route::post('/{id}/participants', [CagnotteController::class, 'addParticipant']);
         Route::post('/{id}/unlock', [CagnotteController::class, 'requestUnlock']); // Demande de déblocage
         Route::get('/{id}/transactions', [CagnotteTransactionController::class, 'index']);
         Route::post('/{id}/archive', [CagnotteController::class, 'archive']);
+
+        // Commentaires (écriture avec auth)
+        Route::post('/{id}/comments', [CagnotteInteractionController::class, 'storeComment']);
+        Route::delete('/{id}/comments/{commentId}', [CagnotteInteractionController::class, 'deleteComment']);
+
+        // Likes
+        Route::post('/{id}/like', [CagnotteInteractionController::class, 'toggleLike']);
+        Route::get('/{id}/like', [CagnotteInteractionController::class, 'checkLike']);
     });
 });
 

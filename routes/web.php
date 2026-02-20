@@ -10,6 +10,8 @@ Route::get('/', function () {
 
 Route::get('/c/{id}', [WebContributionController::class, 'show'])->name('cagnotte.web_show');
 Route::post('/c/{id}/contribute', [WebContributionController::class, 'contribute'])->name('cagnotte.web_contribute');
+Route::post('/c/{id}/comment', [WebContributionController::class, 'storeComment'])->name('cagnotte.web_comment');
+
 
 Route::get('/payments/success', function () {
     return view('contributions.success');
@@ -35,6 +37,12 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::post('/cagnottes/{id}/approve-unlock', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'approveUnlock'])->name('admin.cagnottes.approve-unlock');
     Route::post('/cagnottes/{id}/reject-unlock', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'rejectUnlock'])->name('admin.cagnottes.reject-unlock');
     Route::post('/cagnottes/{id}/process-payout', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'processPayout'])->name('admin.cagnottes.process-payout');
+
+    // Modération
+    Route::post('/cagnottes/{id}/activate', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'activate'])->name('admin.cagnottes.activate');
+    Route::post('/cagnottes/{id}/block', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'block'])->name('admin.cagnottes.block');
+    Route::post('/cagnottes/{id}/comments/{commentId}/block', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'blockComment'])->name('admin.cagnottes.block-comment');
+
     Route::get('/transactions', [\App\Http\Controllers\Web\Admin\AdminTransactionController::class, 'index'])->name('admin.transactions.index');
 
     // Audit Logs
