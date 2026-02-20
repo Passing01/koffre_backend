@@ -58,6 +58,7 @@ class Cagnotte extends Model
         'unlocked_at' => 'datetime',
         'payout_processed_at' => 'datetime',
         'is_archived' => 'boolean',
+        'blocked_at' => 'datetime',
     ];
 
     protected $appends = [
