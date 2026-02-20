@@ -87,21 +87,34 @@
             const urlParams = new URLSearchParams(window.location.search);
             const token = urlParams.get('token');
 
-            if (token && token.startsWith('sim_token_')) {
+            // Tentative de redirection vers l'application
+            setTimeout(() => {
+                window.location.href = 'koffre://payment/success';
+            }, 3000);
+
+            if (token && (token.startsWith('sim_token_') || token.startsWith('sim_genius_'))) {
                 const statusDiv = document.getElementById('simulation-status');
                 const statusText = document.getElementById('status-text');
                 statusDiv.style.display = 'block';
 
+                const webhookUrl = token.startsWith('sim_genius_')
+                    ? '/api/payments/geniuspay/webhook'
+                    : '/api/payments/paydunya/webhook';
+
+                const payload = token.startsWith('sim_genius_')
+                    ? { data: { reference: token, status: 'completed' } }
+                    : { token: token };
+
                 console.log('Simulation token detected, triggering webhook...', token);
 
-                fetch('/api/payments/paydunya/webhook', {
+                fetch(webhookUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     },
-                    body: JSON.stringify({ token: token })
+                    body: JSON.stringify(payload)
                 })
                     .then(response => response.json())
                     .then(data => {

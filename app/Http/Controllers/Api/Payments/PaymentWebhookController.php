@@ -111,21 +111,15 @@ class PaymentWebhookController extends Controller
     {
         Log::info('GeniusPay Webhook Received', $request->all());
 
-        $signature = $request->header('X-GeniusPay-Signature');
-        $payload = $request->getContent();
-
-        // Verification of signature could be added here if secret is known
-        // For now, we trust the reference and re-verify via API if needed
-
-        $data = $request->input('data', []);
-        $reference = $data['reference'] ?? null;
-        $status = $data['status'] ?? null;
+        // GeniusPay can send data in a 'data' object or at the root level
+        $reference = $request->input('data.reference') ?? $request->input('reference');
+        $status = $request->input('data.status') ?? $request->input('status');
 
         if (!$reference) {
             return response()->json(['message' => 'Reference missing'], 400);
         }
 
-        if (in_array($status, ['completed', 'success', 'paid'])) {
+        if (in_array(strtolower($status), ['completed', 'success', 'paid'])) {
             try {
                 // Re-verify for security
                 if ($this->paymentService->verifyPayment($reference)) {
@@ -138,6 +132,6 @@ class PaymentWebhookController extends Controller
             }
         }
 
-        return response()->json(['message' => 'Notification received']);
+        return response()->json(['message' => 'Notification received with status: ' . $status]);
     }
 }

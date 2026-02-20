@@ -59,6 +59,7 @@ class GeniusPayService implements PaymentServiceInterface
                     'description' => $description,
                     'success_url' => url('/payments/success'),
                     'error_url' => url('/payments/cancel'),
+                    'callback_url' => url('/api/payments/geniuspay/webhook'),
                     'customer' => [
                         'name' => $customer['name'] ?? 'Kofre User',
                         'email' => $customer['email'] ?? 'user@kofre.com',
