@@ -61,6 +61,7 @@ class Cagnotte extends Model
         'blocked_at' => 'datetime',
     ];
 
+
     protected $appends = [
         'profile_photo_url',
         'identity_document_url',
