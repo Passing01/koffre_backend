@@ -37,7 +37,14 @@ class CagnotteService
     public function listMine(User $user): Collection
     {
         return Cagnotte::query()
-            ->where('user_id', $user->id)
+            ->where(function ($query) use ($user) {
+                // Cagnottes created by me
+                $query->where('user_id', $user->id)
+                    // OR Cagnottes where I am a participant
+                    ->orWhereHas('participants', function ($q) use ($user) {
+                    $q->where('phone', $user->phone);
+                });
+            })
             ->orderByDesc('id')
             ->get();
     }

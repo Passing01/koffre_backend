@@ -30,6 +30,7 @@ Route::prefix('cagnottes')->group(function () {
         Route::post('/{id}/unlock', [CagnotteController::class, 'requestUnlock']); // Demande de déblocage
         Route::get('/{id}/transactions', [CagnotteTransactionController::class, 'index']);
         Route::post('/{id}/archive', [CagnotteController::class, 'archive']);
+        Route::post('/{id}/unarchive', [CagnotteController::class, 'unarchive']);
 
         // Commentaires (écriture avec auth)
         Route::post('/{id}/comments', [CagnotteInteractionController::class, 'storeComment']);

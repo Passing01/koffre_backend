@@ -152,6 +152,22 @@ class CagnotteController extends Controller
         ]);
     }
 
+    public function unarchive(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $cagnotte = Cagnotte::query()
+            ->where('id', $id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $cagnotte->update(['is_archived' => false]);
+
+        return response()->json([
+            'message' => 'Cagnotte désarchivée avec succès.',
+            'data' => $cagnotte,
+        ]);
+    }
+
     public function update(UpdateCagnotteRequest $request, int $id): JsonResponse
     {
         $user = $request->user();
