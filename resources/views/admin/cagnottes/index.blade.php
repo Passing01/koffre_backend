@@ -123,7 +123,7 @@
                                             <td class="px-6 py-4">
                                                 <span
                                                     class="px-3 py-1 text-xs font-semibold rounded-full
-                                                                                            {{ $cagnotte->status === 'active' ? 'bg-green-100 text-green-700' :
+                                                                                                                                    {{ $cagnotte->status === 'active' ? 'bg-green-100 text-green-700' :
                             ($cagnotte->status === 'completed' ? 'bg-blue-100 text-blue-700' :
                                 ($cagnotte->status === 'expired' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')) }}">
                                                     {{ ucfirst($cagnotte->status) }}
@@ -138,10 +138,15 @@
                                             <td class="px-6 py-4">
                                                 <span
                                                     class="px-3 py-1 text-xs font-semibold rounded-full
-                                                                                            {{ $cagnotte->visibility === 'public' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700' }}">
+                                                                                                                {{ $cagnotte->visibility === 'public' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700' }}">
                                                     <i class="fas fa-{{ $cagnotte->visibility === 'public' ? 'globe' : 'lock' }}"></i>
                                                     {{ ucfirst($cagnotte->visibility) }}
                                                 </span>
+                                                @if($cagnotte->is_private_coffre)
+                                                    <div class="mt-1 flex items-center gap-1 text-[10px] font-bold text-indigo-600">
+                                                        <i class="fas fa-shield-alt scale-75"></i> SYSTÈME COFFRE
+                                                    </div>
+                                                @endif
                                             </td>
                                             <td class="px-6 py-4 text-sm text-gray-600">
                                                 {{ $cagnotte->created_at->format('d/m/Y') }}

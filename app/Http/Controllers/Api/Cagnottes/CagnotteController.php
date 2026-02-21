@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api\Cagnottes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cagnottes\AddParticipantRequest;
 use App\Http\Requests\Cagnottes\StoreCagnotteRequest;
+use App\Http\Requests\Cagnottes\StorePublicDirectRequest;
+use App\Http\Requests\Cagnottes\StorePublicCoffreRequest;
+use App\Http\Requests\Cagnottes\StorePrivateCagnotteRequest;
 use App\Http\Requests\Cagnottes\UnlockCagnotteRequest;
 use App\Http\Requests\Cagnottes\UpdateCagnotteRequest;
 use App\Models\Cagnotte;
@@ -49,6 +52,44 @@ class CagnotteController extends Controller
             'data' => $cagnotte,
         ], 201);
     }
+
+    public function storePublicDirect(StorePublicDirectRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $cagnotte = $this->cagnotteService->createPublicDirect($user, $request->validated());
+
+        return response()->json([
+            'message' => 'Cagnotte publique (Mode Direct) créée.',
+            'data' => $cagnotte,
+        ], 201);
+    }
+
+    public function storePublicCoffre(StorePublicCoffreRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $cagnotte = $this->cagnotteService->createPublicCoffre($user, $request->validated());
+
+        return response()->json([
+            'message' => 'Cagnotte publique (Mode Coffre) créée.',
+            'data' => $cagnotte,
+        ], 201);
+    }
+
+
+    public function storePrivate(StorePrivateCagnotteRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $cagnotte = $this->cagnotteService->createPrivateCoffre($user, $request->validated());
+
+        return response()->json([
+            'message' => 'Cagnotte privée (Coffre) créée.',
+            'data' => $cagnotte,
+        ], 201);
+    }
+
 
     public function show(Request $request, int $id): JsonResponse
     {

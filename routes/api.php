@@ -20,7 +20,10 @@ Route::prefix('cagnottes')->group(function () {
     Route::get('/{id}/comments', [CagnotteInteractionController::class, 'listComments']);
 
     Route::middleware('auth:sanctum')->group(function () {
-        Route::post('/', [CagnotteController::class, 'store']);
+        Route::post('/', [CagnotteController::class, 'store']); // Fallback / Global
+        Route::post('/public/direct', [CagnotteController::class, 'storePublicDirect']);
+        Route::post('/public/coffre', [CagnotteController::class, 'storePublicCoffre']);
+        Route::post('/private', [CagnotteController::class, 'storePrivate']);
         Route::get('/{id}', [CagnotteController::class, 'show']);
         Route::put('/{id}', [CagnotteController::class, 'update']);              // Modifier la cagnotte
         Route::post('/{id}/participants', [CagnotteController::class, 'addParticipant']);

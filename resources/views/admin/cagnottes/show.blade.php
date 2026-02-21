@@ -93,7 +93,7 @@
                 <!-- Escrow Unlock Section -->
                 <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 {{ $cagnotte->unlock_status === 'pending' ? 'border-orange-500' : ($cagnotte->unlock_status === 'approved' ? 'border-green-500' : ($cagnotte->unlock_status === 'rejected' ? 'border-red-500' : 'border-gray-200')) }}">
                     <h3 class="text-xl font-bold text-gray-900 mb-4">
-                        <i class="fas fa-lock-open text-orange-600"></i> Gestion du déblocage (Mode Coffre)
+                        <i class="fas fa-lock-open text-orange-600"></i> Gestion du déblocage {{ $cagnotte->is_private_coffre ? '(Système Privé/Coffre)' : '(Mode Coffre Standard)' }}
                     </h3>
                     
                     <div class="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -281,6 +281,24 @@
                             <p class="text-sm text-gray-600">Méthode de paiement</p>
                             <p class="font-semibold text-gray-900">{{ ucfirst($cagnotte->payout_method ?? 'N/A') }}</p>
                         </div>
+                        @if($cagnotte->is_private_coffre)
+                        <div class="col-span-2 border-t pt-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-shield-alt text-indigo-600"></i>
+                                <span class="font-bold text-indigo-900 uppercase">Système Privé/Coffre</span>
+                            </div>
+                            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                                <p class="text-sm text-indigo-800 flex items-center gap-2">
+                                    <i class="fas fa-file-contract"></i>
+                                    Politiques et règles acceptées : 
+                                    <span class="font-bold {{ $cagnotte->accepted_policy ? 'text-green-600' : 'text-red-600' }}">
+                                        {{ $cagnotte->accepted_policy ? 'OUI' : 'NON' }}
+                                    </span>
+                                </p>
+                                <p class="text-xs text-indigo-600 mt-1 italic">Le créateur a coché et accepté les termes de cette fonctionnalité pour dégager la responsabilité juridique du projet.</p>
+                            </div>
+                        </div>
+                        @endif
                     </div>
                 </div>
 

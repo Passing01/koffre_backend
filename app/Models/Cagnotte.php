@@ -46,6 +46,8 @@ class Cagnotte extends Model
         'is_archived',
         'moderation_reason',
         'blocked_at',
+        'is_private_coffre',
+        'accepted_policy',
     ];
 
     protected $casts = [
@@ -59,6 +61,8 @@ class Cagnotte extends Model
         'payout_processed_at' => 'datetime',
         'is_archived' => 'boolean',
         'blocked_at' => 'datetime',
+        'is_private_coffre' => 'boolean',
+        'accepted_policy' => 'boolean',
     ];
 
 

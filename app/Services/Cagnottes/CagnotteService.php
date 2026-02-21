@@ -115,6 +115,35 @@ class CagnotteService
         });
     }
 
+    public function createPrivateCoffre(User $user, array $data): Cagnotte
+    {
+        $data['visibility'] = 'private';
+        $data['payout_mode'] = 'escrow';
+        $data['is_private_coffre'] = true;
+        $data['creator_type'] = 'physique';
+        // accepted_policy is already validated as true in the request
+
+        return $this->create($user, $data);
+    }
+
+    public function createPublicDirect(User $user, array $data): Cagnotte
+    {
+        $data['visibility'] = 'public';
+        $data['payout_mode'] = 'direct';
+        $data['is_private_coffre'] = false;
+
+        return $this->create($user, $data);
+    }
+
+    public function createPublicCoffre(User $user, array $data): Cagnotte
+    {
+        $data['visibility'] = 'public';
+        $data['payout_mode'] = 'escrow';
+        $data['is_private_coffre'] = false;
+
+        return $this->create($user, $data);
+    }
+
     public function updateCagnotte(int $cagnotteId, User $user, array $data): Cagnotte
     {
         $cagnotte = Cagnotte::query()->findOrFail($cagnotteId);
@@ -264,6 +293,12 @@ class CagnotteService
         if ($cagnotte->payout_mode !== 'escrow') {
             throw ValidationException::withMessages([
                 'payout_mode' => ['Cette cagnotte n\'est pas en mode coffre.'],
+            ]);
+        }
+
+        if ($cagnotte->is_private_coffre) {
+            throw ValidationException::withMessages([
+                'cagnotte_id' => ['Le système privé/coffre ne permet pas de déblocage anticipé.'],
             ]);
         }
 
