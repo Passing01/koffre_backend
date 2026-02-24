@@ -24,6 +24,7 @@ class PaymentCallbackController extends Controller
         'cashout.approved',
         'cashout.completed',
         'cashout.failed',
+        'webhook.test',
     ];
 
     public function __construct(
@@ -58,7 +59,7 @@ class PaymentCallbackController extends Controller
             ], 422);
         }
 
-        if (!$reference) {
+        if (!$reference && $event !== 'webhook.test') {
             return response()->json([
                 'success' => false,
                 'message' => 'Référence de transaction manquante.',
@@ -77,6 +78,7 @@ class PaymentCallbackController extends Controller
                 'cashout.approved' => ['message' => 'Cashout approuvé.'],
                 'cashout.completed' => $this->onCashoutCompleted($reference),
                 'cashout.failed' => ['message' => 'Cashout échoué.'],
+                'webhook.test' => ['message' => 'Webhook de test validé avec succès.'],
                 default => ['message' => 'Événement reçu.'],
             };
         } catch (\Throwable $e) {
