@@ -21,16 +21,27 @@ class TontineService
     ) {
     }
 
-    public function listMine(User $user): Collection
+    public function listMine(User $user, ?string $role = null): Collection
     {
-        return Tontine::query()
-            ->where(function ($query) use ($user) {
-                $query->where('user_id', $user->id)
-                    ->orWhereHas('members', function ($q) use ($user) {
-                        $q->where('phone', $user->phone);
+        $query = Tontine::query();
+
+        if ($role === 'creator') {
+            $query->where('user_id', $user->id);
+        } elseif ($role === 'member') {
+            $query->whereHas('members', function ($q) use ($user) {
+                $q->where('phone', $user->phone);
+            })->where('user_id', '!=', $user->id);
+        } else {
+            // Unified list
+            $query->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                    ->orWhereHas('members', function ($m) use ($user) {
+                        $m->where('phone', $user->phone);
                     });
-            })
-            ->with(['members', 'user:id,fullname,phone'])
+            });
+        }
+
+        return $query->with(['members', 'user:id,fullname,phone'])
             ->orderByDesc('id')
             ->get();
     }

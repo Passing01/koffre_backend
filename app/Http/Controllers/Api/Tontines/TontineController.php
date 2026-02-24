@@ -17,7 +17,8 @@ class TontineController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $tontines = $this->tontineService->listMine($request->user());
+        $role = $request->query('role');
+        $tontines = $this->tontineService->listMine($request->user(), $role);
 
         return response()->json([
             'data' => $tontines,
