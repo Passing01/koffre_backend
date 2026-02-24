@@ -34,18 +34,18 @@ class TontineController extends Controller
         ], 201);
     }
 
-    public function show(int $id, Request $request): JsonResponse
+    public function show($id, Request $request): JsonResponse
     {
-        $details = $this->tontineService->getDetails($id, $request->user());
+        $details = $this->tontineService->getDetails((int) $id, $request->user());
 
         return response()->json([
             'data' => $details,
         ]);
     }
 
-    public function update(int $id, UpdateTontineRequest $request): JsonResponse
+    public function update($id, UpdateTontineRequest $request): JsonResponse
     {
-        $tontine = $this->tontineService->update($id, $request->user(), $request->validated());
+        $tontine = $this->tontineService->update((int) $id, $request->user(), $request->validated());
 
         return response()->json([
             'message' => 'Paramètres de la tontine mis à jour.',
@@ -53,7 +53,7 @@ class TontineController extends Controller
         ]);
     }
 
-    public function addMember(int $id, Request $request): JsonResponse
+    public function addMember($id, Request $request): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string',
@@ -61,7 +61,7 @@ class TontineController extends Controller
             'permissions' => 'nullable|array',
         ]);
 
-        $member = $this->tontineService->addMember($id, $request->user(), $request->only(['phone', 'payout_rank', 'permissions']));
+        $member = $this->tontineService->addMember((int) $id, $request->user(), $request->only(['phone', 'payout_rank', 'permissions']));
 
         return response()->json([
             'message' => 'Membre invité.',
@@ -69,7 +69,7 @@ class TontineController extends Controller
         ]);
     }
 
-    public function setRanks(int $id, Request $request): JsonResponse
+    public function setRanks($id, Request $request): JsonResponse
     {
         $request->validate([
             'ranks' => 'required|array',
@@ -77,20 +77,20 @@ class TontineController extends Controller
             'ranks.*.rank' => 'required|integer|min:1',
         ]);
 
-        $this->tontineService->setRanks($id, $request->user(), $request->input('ranks'));
+        $this->tontineService->setRanks((int) $id, $request->user(), $request->input('ranks'));
 
         return response()->json([
             'message' => 'L\'ordre de prise a été mis à jour.',
         ]);
     }
 
-    public function updateMemberPermissions(int $id, string $phone, Request $request): JsonResponse
+    public function updateMemberPermissions($id, string $phone, Request $request): JsonResponse
     {
         $request->validate([
             'permissions' => 'required|array',
         ]);
 
-        $member = $this->tontineService->updateMemberPermissions($id, $request->user(), $phone, $request->input('permissions'));
+        $member = $this->tontineService->updateMemberPermissions((int) $id, $request->user(), $phone, $request->input('permissions'));
 
         return response()->json([
             'message' => 'Permissions mises à jour.',
