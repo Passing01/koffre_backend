@@ -57,12 +57,10 @@ class GeniusPayService implements PaymentServiceInterface
                     'amount' => (int) $amount,
                     'currency' => $currency,
                     'description' => $description,
-                    'success_url' => url('/payments/success?token=' . $transactionId),
-                    'cancel_url' => url('/payments/cancel'),
-                    'callback_url' => url('/api/payments/geniuspay/webhook'),
-                    'redirect_url' => url('/payments/success?token=' . $transactionId), // Alias de sécurité
-                    'return_url' => url('/payments/success?token=' . $transactionId),   // Alias classique
-                    'notify_url' => url('/api/payments/geniuspay/webhook'),            // Alias classique
+                    'success_url' => route('payments.callback', ['reference' => $transactionId, 'event' => 'payment.success', 'provider' => 'geniuspay']),
+                    'cancel_url' => route('payments.callback', ['reference' => $transactionId, 'event' => 'payment.cancelled', 'provider' => 'geniuspay']),
+                    'callback_url' => route('webhooks.geniuspay'),
+                    'notify_url' => route('webhooks.geniuspay'),
                     'customer' => [
                         'name' => $customer['name'] ?? 'Kofre User',
                         'email' => $customer['email'] ?? 'user@kofre.com',
@@ -151,23 +149,27 @@ class GeniusPayService implements PaymentServiceInterface
 
         $provider = $this->guessProvider($account, $method);
 
-        $response = Http::withToken($this->secretKey)
-            ->post("{$this->baseUrl}/payouts", [
-                'wallet_id' => $this->walletId,
-                'amount' => (int) $amount,
-                'currency' => 'XOF',
-                'description' => $description,
-                'destination' => [
-                    'type' => 'mobile_money',
-                    'provider' => $provider,
-                    'account' => $account,
-                ],
-                'recipient' => [
-                    'name' => 'Kofre User',
-                    'phone' => $account,
-                ],
-                'idempotency_key' => 'payout_' . md5($account . $amount . $description . time()),
-            ]);
+        $response = Http::withHeaders([
+            'X-API-Key' => $this->publicKey,
+            'X-API-Secret' => $this->secretKey,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ])->post("{$this->baseUrl}/payouts", [
+                    'wallet_id' => $this->walletId,
+                    'amount' => (int) $amount,
+                    'currency' => 'XOF',
+                    'description' => $description,
+                    'destination' => [
+                        'type' => 'mobile_money',
+                        'provider' => $provider,
+                        'account' => $account,
+                    ],
+                    'recipient' => [
+                        'name' => 'Kofre User',
+                        'phone' => $account,
+                    ],
+                    'idempotency_key' => 'payout_' . md5($account . $amount . $description . time()),
+                ]);
 
         if ($response->failed()) {
             Log::error('GeniusPay Payout Failed', [

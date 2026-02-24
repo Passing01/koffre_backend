@@ -65,6 +65,7 @@ return [
         'base_url' => env('GENIUSPAY_BASE_URL', 'https://pay.genius.ci/api/v1/merchant'),
         'mode' => env('GENIUSPAY_MODE', 'test'),
         'simulation' => env('GENIUSPAY_SIMULATION', false),
+        'webhook_secret' => env('GENIUSPAY_WEBHOOK_SECRET', ''),
     ],
 
     'default_gateway' => env('PAYMENT_GATEWAY', 'geniuspay') ?: 'geniuspay',

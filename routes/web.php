@@ -13,13 +13,23 @@ Route::post('/c/{id}/contribute', [WebContributionController::class, 'contribute
 Route::post('/c/{id}/comment', [WebContributionController::class, 'storeComment'])->name('cagnotte.web_comment');
 
 
-Route::get('/payments/success', function () {
-    return view('contributions.success');
+// ─── Callback de paiement Web (navigateur redirigé par la passerelle) ────────
+// URL à configurer dans le tableau de bord de votre prestataire de paiement :
+//   https://votre-domaine.com/payments/callback?event={event}&reference={reference}&provider={provider}
+//
+// Paramètres optionnels pour rétrocompatibilité : token, status
+Route::get('/payments/callback', [\App\Http\Controllers\Web\WebPaymentCallbackController::class, 'handle'])
+    ->name('payment.callback');
+
+// Alias de rétrocompatibilité → redirigent vers le callback unifié
+Route::get('/payments/success', function (\Illuminate\Http\Request $req) {
+    return redirect()->route('payment.callback', array_merge($req->all(), ['event' => 'payment.success']));
 })->name('payment.success');
 
-Route::get('/payments/cancel', function () {
-    return view('contributions.cancel');
+Route::get('/payments/cancel', function (\Illuminate\Http\Request $req) {
+    return redirect()->route('payment.callback', array_merge($req->all(), ['event' => 'payment.cancelled']));
 })->name('payment.cancel');
+
 
 // Admin Authentication Routes
 Route::prefix('admin')->group(function () {

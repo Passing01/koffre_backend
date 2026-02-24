@@ -54,6 +54,18 @@
             border-radius: 10px;
             font-weight: 600;
         }
+
+        .btn-outline {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            border: 2px solid #94a3b8;
+            color: #64748b;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+        }
     </style>
 </head>
 
@@ -62,9 +74,19 @@
         <div class="icon">
             <i class="fa-solid fa-circle-xmark"></i>
         </div>
-        <h1>Paiement annulé</h1>
-        <p>Le processus de paiement a été interrompu. Vous pouvez réessayer à tout moment.</p>
-        <a href="/" class="btn">Retour à l'accueil</a>
+        <h1>Paiement interrompu</h1>
+        <p>{{ $message ?? 'Le processus de paiement a été interrompu. Vous pouvez réessayer à tout moment.' }}</p>
+
+        @if(isset($cagnotte))
+            <a href="{{ route('cagnotte.web_show', $cagnotte->id) }}" class="btn">Retour à la cagnotte</a>
+        @else
+            <a href="/" class="btn">Retour à l'accueil</a>
+        @endif
+
+        <br>
+        <a href="{{ $deeplink ?? 'koffre://payment/failed' }}" class="btn-outline">
+            <i class="fa-solid fa-mobile-screen"></i> Ouvrir dans l'application
+        </a>
     </div>
 </body>
 

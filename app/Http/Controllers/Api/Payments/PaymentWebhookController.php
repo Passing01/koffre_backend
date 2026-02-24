@@ -109,29 +109,92 @@ class PaymentWebhookController extends Controller
 
     public function handleGeniusPay(Request $request)
     {
-        Log::info('GeniusPay Webhook Received', $request->all());
+        Log::info('GeniusPay Webhook Received', [
+            'headers' => $request->headers->all(),
+            'body' => $request->all()
+        ]);
 
-        // GeniusPay can send data in a 'data' object or at the root level
-        $reference = $request->input('data.reference') ?? $request->input('reference');
-        $status = $request->input('data.status') ?? $request->input('status');
+        // 1. Récupérer les headers de sécurité
+        $signature = $request->header('X-Webhook-Signature');
+        $timestamp = $request->header('X-Webhook-Timestamp');
+        $event = $request->header('X-Webhook-Event');
 
-        if (!$reference) {
-            return response()->json(['message' => 'Reference missing'], 400);
+        // 2. Vérification basique des headers
+        if (!$signature || !$timestamp || !$event) {
+            Log::warning('GeniusPay Webhook: Headers de sécurité manquants');
+            return response()->json(['message' => 'Missing security headers'], 400);
         }
 
-        if (in_array(strtolower($status), ['completed', 'success', 'paid'])) {
-            try {
-                // Re-verify for security
-                if ($this->paymentService->verifyPayment($reference)) {
-                    $this->contributionService->complete($reference);
-                    return response()->json(['message' => 'GeniusPay payment completed']);
-                }
-            } catch (\Exception $e) {
-                Log::error('GeniusPay webhook processing error', ['error' => $e->getMessage()]);
-                return response()->json(['message' => 'Error'], 500);
+        // 3. Vérifier la signature HMAC SHA-256
+        $secret = config('services.geniuspay.webhook_secret');
+        if (empty($secret)) {
+            Log::error('GeniusPay Webhook: Webhook secret non configuré');
+            // En dev/test on peut laisser passer si configuré ainsi, mais en prod c'est bloquant
+            if (config('app.env') === 'production') {
+                return response()->json(['message' => 'Configuration error'], 500);
+            }
+        } else {
+            // signature = HMAC-SHA256(timestamp + "." + json_payload, secret)
+            // Utiliser getContent() pour avoir le JSON brut exact
+            $payload = $request->getContent();
+            $dataToSign = $timestamp . '.' . $payload;
+            $expectedSignature = hash_hmac('sha256', $dataToSign, $secret);
+
+            if (!hash_equals($expectedSignature, $signature)) {
+                Log::warning('GeniusPay Webhook: Signature invalide', [
+                    'received' => $signature,
+                    'expected' => $expectedSignature
+                ]);
+                return response()->json(['message' => 'Invalid signature'], 401);
             }
         }
 
-        return response()->json(['message' => 'Notification received with status: ' . $status]);
+        // 4. Vérifier le timestamp (fenêtre de 5 minutes) para rapport au Replay Attack
+        $timeDiff = abs(time() - (int) $timestamp);
+        if ($timeDiff > 300) {
+            Log::warning('GeniusPay Webhook: Timestamp trop ancien', ['diff' => $timeDiff]);
+            return response()->json(['message' => 'Timestamp too old'], 400);
+        }
+
+        // 5. Traitement de l'événement
+        $payloadData = $request->all();
+        $reference = $payloadData['data']['reference'] ?? null;
+        $status = $payloadData['data']['status'] ?? null;
+
+        if (!$reference) {
+            Log::warning('GeniusPay Webhook: Référence manquante dans le payload');
+            return response()->json(['message' => 'Reference missing'], 400);
+        }
+
+        // Gérer les différents types d'événements
+        switch ($event) {
+            case 'payment.success':
+                try {
+                    if (str_starts_with($reference, 'TON-')) {
+                        $tontineService = app(\App\Services\Tontines\TontineService::class);
+                        $tontineService->completePayment($reference);
+                        return response()->json(['message' => 'Tontine payment processed']);
+                    }
+
+                    $this->contributionService->complete($reference);
+                    return response()->json(['message' => 'Contribution payment processed']);
+                } catch (\Exception $e) {
+                    Log::error('GeniusPay Webhook Error: ' . $e->getMessage());
+                    return response()->json(['message' => 'Internal error'], 500);
+                }
+
+            case 'payment.failed':
+            case 'payment.cancelled':
+                Log::info('GeniusPay Payment issue', ['event' => $event, 'ref' => $reference]);
+                return response()->json(['message' => 'Event acknowledged']);
+
+            case 'webhook.test':
+                Log::info('GeniusPay Webhook Test Success');
+                return response()->json(['message' => 'Test successful']);
+
+            default:
+                Log::info('GeniusPay Webhook: Event not handled', ['event' => $event]);
+                return response()->json(['message' => 'Event ignored']);
+        }
     }
 }

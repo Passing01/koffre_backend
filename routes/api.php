@@ -42,6 +42,17 @@ Route::prefix('cagnottes')->group(function () {
     });
 });
 
+Route::middleware('auth:sanctum')->prefix('tontines')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'store']);
+    Route::get('/{id}', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'show']);
+    Route::put('/{id}', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'update']);
+    Route::post('/{id}/members', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'addMember']);
+    Route::put('/{id}/ranks', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'setRanks']);
+    Route::put('/{id}/members/{phone}/permissions', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'updateMemberPermissions']);
+    Route::post('/{id}/pay', [\App\Http\Controllers\Api\Tontines\TontinePaymentController::class, 'pay']);
+});
+
 Route::middleware('auth:sanctum')->get('/my-cagnottes', [CagnotteController::class, 'mine']);
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -57,4 +68,9 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::post('/payments/webhook', [\App\Http\Controllers\Api\Payments\PaymentWebhookController::class, 'handleCinetPay']);
 Route::post('/payments/fedapay/webhook', [\App\Http\Controllers\Api\Payments\PaymentWebhookController::class, 'handleFedaPay']);
 Route::post('/payments/paydunya/webhook', [\App\Http\Controllers\Api\Payments\PaymentWebhookController::class, 'handlePayDunya']);
-Route::post('/payments/geniuspay/webhook', [\App\Http\Controllers\Api\Payments\PaymentWebhookController::class, 'handleGeniusPay']);
+Route::post('/payments/geniuspay/webhook', [\App\Http\Controllers\Api\Payments\PaymentWebhookController::class, 'handleGeniusPay'])->name('webhooks.geniuspay');
+
+// ─── Callback unifié (redirection depuis la passerelle de paiement) ─────────────
+// Accepte GET (navigateur redirigé) et POST (IPN/webhook générique)
+Route::match(['get', 'post'], '/payments/callback', [\App\Http\Controllers\Api\Payments\PaymentCallbackController::class, 'handle'])
+    ->name('payments.callback');

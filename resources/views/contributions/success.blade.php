@@ -48,6 +48,29 @@
             margin-bottom: 30px;
         }
 
+        .info-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+
+        .info-box .label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-box .value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #111827;
+            margin-top: 2px;
+        }
+
         .btn {
             display: inline-block;
             padding: 15px 30px;
@@ -62,6 +85,18 @@
         .btn:hover {
             transform: translateY(-2px);
         }
+
+        .btn-outline {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 10px 20px;
+            border: 2px solid #6366f1;
+            color: #6366f1;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+        }
     </style>
 </head>
 
@@ -71,65 +106,53 @@
             <i class="fa-solid fa-circle-check"></i>
         </div>
         <h1>Merci beaucoup !</h1>
-        <p>Votre contribution a été enregistrée avec succès. Elle sera visible sur la cagnotte dès que le paiement sera
-            confirmé par l'opérateur.</p>
+        <p>Votre contribution a été enregistrée avec succès.</p>
 
-        <div id="simulation-status"
-            style="display: none; margin-bottom: 20px; padding: 15px; border-radius: 12px; background: #fef3c7; color: #92400e; font-size: 14px; border: 1px solid #fde68a;">
-            <i class="fas fa-robot mr-2"></i> Mode Simulation : <span id="status-text">Validation en cours...</span>
-        </div>
+        @if(isset($contribution))
+            <div class="info-box">
+                <div class="label">Montant versé</div>
+                <div class="value">{{ number_format($contribution->amount, 0, ',', ' ') }} XOF</div>
+            </div>
+        @endif
 
-        <a href="/" class="btn">Retour à Koffre</a>
+        @if(isset($cagnotte))
+            <div class="info-box">
+                <div class="label">Cagnotte</div>
+                <div class="value">{{ $cagnotte->title }}</div>
+            </div>
+        @endif
+
+        @if(isset($tontine))
+            <div class="info-box">
+                <div class="label">Tontine</div>
+                <div class="value">{{ $tontine->title }}</div>
+            </div>
+        @endif
+
+        @if(isset($reference))
+            <div class="info-box">
+                <div class="label">Référence</div>
+                <div class="value" style="font-size:13px; word-break:break-all;">{{ $reference }}</div>
+            </div>
+        @endif
+
+        @if(isset($cagnotte))
+            <a href="{{ route('cagnotte.web_show', $cagnotte->id) }}" class="btn">Voir la cagnotte</a>
+        @else
+            <a href="/" class="btn">Retour à Koffre</a>
+        @endif
+
+        <br>
+        <a href="{{ $deeplink ?? 'koffre://payment/success' }}" class="btn-outline">
+            <i class="fa-solid fa-mobile-screen"></i> Ouvrir dans l'application
+        </a>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const urlParams = new URLSearchParams(window.location.search);
-            const token = urlParams.get('token');
-
-            // Tentative de redirection vers l'application
-            setTimeout(() => {
-                window.location.href = 'koffre://payment/success';
-            }, 3000);
-
-            if (token && (token.startsWith('sim_token_') || token.startsWith('sim_genius_'))) {
-                const statusDiv = document.getElementById('simulation-status');
-                const statusText = document.getElementById('status-text');
-                statusDiv.style.display = 'block';
-
-                const webhookUrl = token.startsWith('sim_genius_')
-                    ? '/api/payments/geniuspay/webhook'
-                    : '/api/payments/paydunya/webhook';
-
-                const payload = token.startsWith('sim_genius_')
-                    ? { data: { reference: token, status: 'completed' } }
-                    : { token: token };
-
-                console.log('Simulation token detected, triggering webhook...', token);
-
-                fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: JSON.stringify(payload)
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('Webhook triggered successfully:', data);
-                        statusText.innerText = 'Paiement simulé validé avec succès !';
-                        statusDiv.style.background = '#d1fae5';
-                        statusDiv.style.color = '#065f46';
-                        statusDiv.style.borderColor = '#a7f3d0';
-                    })
-                    .catch(error => {
-                        console.error('Error triggering simulated webhook:', error);
-                        statusText.innerText = 'Échec de la simulation du webhook.';
-                    });
-            }
-        });
+        // Redirection automatique vers l'app après 4s
+        setTimeout(() => {
+            window.location.href = '{{ $deeplink ?? "koffre://payment/success" }}';
+        }, 4000);
     </script>
 </body>
 
