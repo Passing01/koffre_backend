@@ -71,6 +71,12 @@
                     <span>Cagnottes</span>
                 </a>
 
+                <a href="{{ route('admin.tontines.index') }}"
+                    class="sidebar-link flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.tontines.*') ? 'active' : '' }}">
+                    <i class="fas fa-circle-nodes w-5"></i>
+                    <span>Tontines</span>
+                </a>
+
                 <a href="{{ route('admin.transactions.index') }}"
                     class="sidebar-link flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.transactions.*') ? 'active' : '' }}">
                     <i class="fas fa-exchange-alt w-5"></i>

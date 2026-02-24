@@ -53,6 +53,12 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::post('/cagnottes/{id}/block', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'block'])->name('admin.cagnottes.block');
     Route::post('/cagnottes/{id}/comments/{commentId}/block', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'blockComment'])->name('admin.cagnottes.block-comment');
 
+    // Tontines
+    Route::get('/tontines', [\App\Http\Controllers\Web\Admin\AdminTontineController::class, 'index'])->name('admin.tontines.index');
+    Route::get('/tontines/{id}', [\App\Http\Controllers\Web\Admin\AdminTontineController::class, 'show'])->name('admin.tontines.show');
+    Route::post('/tontines/{id}/disable', [\App\Http\Controllers\Web\Admin\AdminTontineController::class, 'disable'])->name('admin.tontines.disable');
+    Route::post('/tontines/{id}/enable', [\App\Http\Controllers\Web\Admin\AdminTontineController::class, 'enable'])->name('admin.tontines.enable');
+
     Route::get('/transactions', [\App\Http\Controllers\Web\Admin\AdminTransactionController::class, 'index'])->name('admin.transactions.index');
 
     // Audit Logs

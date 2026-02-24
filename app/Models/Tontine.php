@@ -27,6 +27,7 @@ class Tontine extends Model
         'late_fee_amount',
         'max_participants',
         'status',
+        'moderation_reason',
     ];
 
     protected $casts = [
