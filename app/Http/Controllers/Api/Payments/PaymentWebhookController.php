@@ -158,43 +158,71 @@ class PaymentWebhookController extends Controller
 
         // 5. Traitement de l'événement
         $payloadData = $request->all();
-        $reference = $payloadData['data']['reference'] ?? null;
-        $status = $payloadData['data']['status'] ?? null;
 
-        if (!$reference) {
-            Log::warning('GeniusPay Webhook: Référence manquante dans le payload');
-            return response()->json(['message' => 'Reference missing'], 400);
+        // Notre référence interne est dans les metadata (KOF-... ou TON-...)
+        // La référence GeniusPay native (TXN-...) est dans data.reference mais ne correspond pas à notre système
+        $internalRef = $payloadData['data']['metadata']['transaction_id']
+            ?? $payloadData['data']['metadata']['order_id']
+            ?? $payloadData['data']['reference']   // Dernier recours
+            ?? null;
+
+        Log::info('GeniusPay Webhook: Référence extraite', [
+            'event' => $event,
+            'internal_ref' => $internalRef,
+            'geniuspay_ref' => $payloadData['data']['reference'] ?? null,
+        ]);
+
+        // webhook.test ne nécessite pas de référence
+        if ($event === 'webhook.test') {
+            Log::info('GeniusPay Webhook Test Success');
+            return response()->json(['success' => true, 'message' => 'Test successful']);
+        }
+
+        if (!$internalRef) {
+            Log::warning('GeniusPay Webhook: Référence interne manquante dans le payload');
+            return response()->json(['message' => 'Internal reference missing'], 400);
         }
 
         // Gérer les différents types d'événements
         switch ($event) {
             case 'payment.success':
                 try {
-                    if (str_starts_with($reference, 'TON-')) {
+                    if (str_starts_with($internalRef, 'TON-')) {
                         $tontineService = app(\App\Services\Tontines\TontineService::class);
-                        $tontineService->completePayment($reference);
-                        return response()->json(['message' => 'Tontine payment processed']);
+                        $tontineService->completePayment($internalRef);
+                        return response()->json(['success' => true, 'message' => 'Tontine payment processed']);
                     }
 
-                    $this->contributionService->complete($reference);
-                    return response()->json(['message' => 'Contribution payment processed']);
+                    $this->contributionService->complete($internalRef);
+                    return response()->json(['success' => true, 'message' => 'Contribution payment processed']);
                 } catch (\Exception $e) {
-                    Log::error('GeniusPay Webhook Error: ' . $e->getMessage());
-                    return response()->json(['message' => 'Internal error'], 500);
+                    Log::error('GeniusPay Webhook Error: ' . $e->getMessage(), [
+                        'internal_ref' => $internalRef,
+                        'event' => $event,
+                    ]);
+                    return response()->json([
+                        'type' => 'about:blank',
+                        'title' => 'Internal Server Error',
+                        'status' => 500,
+                        'detail' => 'Failed to process webhook',
+                        'instance' => $request->path()
+                    ], 500);
                 }
 
             case 'payment.failed':
             case 'payment.cancelled':
-                Log::info('GeniusPay Payment issue', ['event' => $event, 'ref' => $reference]);
-                return response()->json(['message' => 'Event acknowledged']);
-
-            case 'webhook.test':
-                Log::info('GeniusPay Webhook Test Success');
-                return response()->json(['message' => 'Test successful']);
+            case 'payment.expired':
+                Log::info('GeniusPay Payment issue', ['event' => $event, 'ref' => $internalRef]);
+                // Marquer la contribution/payment comme échouée
+                $contribution = \App\Models\Contribution::where('payment_reference', $internalRef)->first();
+                if ($contribution) {
+                    $contribution->update(['payment_status' => 'failed']);
+                }
+                return response()->json(['success' => true, 'message' => 'Event acknowledged']);
 
             default:
                 Log::info('GeniusPay Webhook: Event not handled', ['event' => $event]);
-                return response()->json(['message' => 'Event ignored']);
+                return response()->json(['success' => true, 'message' => 'Event ignored']);
         }
     }
 }

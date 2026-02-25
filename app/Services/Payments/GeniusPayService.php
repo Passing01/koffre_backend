@@ -57,17 +57,19 @@ class GeniusPayService implements PaymentServiceInterface
                     'amount' => (int) $amount,
                     'currency' => $currency,
                     'description' => $description,
-                    'success_url' => route('payments.callback', ['reference' => $transactionId, 'event' => 'payment.success', 'provider' => 'geniuspay']),
-                    'cancel_url' => route('payments.callback', ['reference' => $transactionId, 'event' => 'payment.cancelled', 'provider' => 'geniuspay']),
-                    'callback_url' => route('webhooks.geniuspay'),
-                    'notify_url' => route('webhooks.geniuspay'),
+                    'success_url' => route('payment.callback', ['reference' => $transactionId, 'event' => 'payment.success', 'provider' => 'geniuspay']),
+                    'error_url' => route('payment.callback', ['reference' => $transactionId, 'event' => 'payment.cancelled', 'provider' => 'geniuspay']),
+                    'redirect_url' => route('payment.callback', ['reference' => $transactionId, 'event' => 'payment.success', 'provider' => 'geniuspay']),
+                    'cancel_url' => route('payment.callback', ['reference' => $transactionId, 'event' => 'payment.cancelled', 'provider' => 'geniuspay']),
+                    'return_url' => route('payment.callback', ['reference' => $transactionId, 'event' => 'payment.success', 'provider' => 'geniuspay']),
                     'customer' => [
                         'name' => $customer['name'] ?? 'Kofre User',
                         'email' => $customer['email'] ?? 'user@kofre.com',
                         'phone' => $customer['phone'] ?? '',
                     ],
                     'metadata' => [
-                        'transaction_id' => $transactionId,
+                        'transaction_id' => $transactionId,  // Notre référence interne (KOF-... ou TON-...)
+                        'order_id' => $transactionId,         // Alias pour compatibilité avec le payload webhook
                     ],
                     'payment_method' => $this->defaultMethod,
                 ]);
