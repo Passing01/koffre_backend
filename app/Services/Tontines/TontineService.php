@@ -364,7 +364,7 @@ class TontineService
 
             $this->auditService->log(
                 action: 'tontine.payment_completed',
-                actorUserId: $payment->tontineMember->user_id,
+                actorUserId: $payment->member?->user_id,
                 auditableType: 'tontine',
                 auditableId: $tontine->id,
                 metadata: [
@@ -375,9 +375,9 @@ class TontineService
             );
 
             // Notify Member
-            if ($payment->tontineMember->user) {
+            if ($payment->member?->user) {
                 $this->fcmService->sendToUser(
-                    $payment->tontineMember->user,
+                    $payment->member->user,
                     "Cotisation confirmée",
                     "Votre paiement de {$payment->amount} XOF pour la tontine '{$tontine->title}' a été validé."
                 );
