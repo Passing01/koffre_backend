@@ -58,6 +58,13 @@ return [
         'simulation' => env('PAYDUNYA_SIMULATION', false),
     ],
 
+    'ikoddi' => [
+        'api_key' => env('IKODDI_API_KEY'),
+        'organization_id' => env('IKODDI_ORGANIZATION_ID'),
+        'otp_app_id' => env('IKODDI_OTP_APP_ID'),
+        'type' => env('IKODDI_OTP_TYPE', 'sms'),
+    ],
+
     'geniuspay' => [
         'public_key' => env('GENIUSPAY_PUBLIC_KEY'),
         'secret_key' => env('GENIUSPAY_SECRET_KEY'),
