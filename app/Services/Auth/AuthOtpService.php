@@ -189,7 +189,10 @@ class AuthOtpService
     private function buildIkoddiIdentity(string $phone, ?string $countryCode): string
     {
         $digitsPhone = preg_replace('/\D+/', '', $phone) ?? '';
-        $digitsCode = preg_replace('/\D+/', (string) $countryCode) ?: '226';
+        $digitsCode = preg_replace('/\D+/', '', (string) $countryCode);
+        if ($digitsCode === '') {
+            $digitsCode = '226';
+        }
 
         if (str_starts_with($digitsPhone, $digitsCode)) {
             return $digitsPhone;
