@@ -98,4 +98,27 @@ class TontineController extends Controller
             'data' => $member,
         ]);
     }
+
+    /**
+     * Compléter l'inscription (nom, prénom, pièce d'identité) pour les membres en attente.
+     */
+    public function completeRegistration($id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'first_name' => 'required|string|max:100',
+            'last_name' => 'required|string|max:100',
+            'identity_document' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+        ]);
+
+        $member = $this->tontineService->completeMemberRegistration(
+            (int) $id,
+            $request->user(),
+            $request->only(['first_name', 'last_name', 'identity_document'])
+        );
+
+        return response()->json([
+            'message' => 'Inscription complétée. Vous pouvez maintenant accéder à la tontine et contribuer.',
+            'data' => $member,
+        ]);
+    }
 }

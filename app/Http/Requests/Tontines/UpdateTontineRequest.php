@@ -23,6 +23,7 @@ class UpdateTontineRequest extends FormRequest
             'creator_percentage' => 'nullable|numeric|min:0|max:100',
             'notification_settings' => 'nullable|array',
             'late_fee_amount' => 'nullable|numeric|min:0',
+            'requires_member_registration' => 'nullable|boolean',
             'status' => 'sometimes|in:pending,active,completed,cancelled',
         ];
     }

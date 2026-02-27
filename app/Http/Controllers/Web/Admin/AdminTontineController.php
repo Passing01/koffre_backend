@@ -64,7 +64,7 @@ class AdminTontineController extends Controller
             'user',
             'members.user',
             'payments' => fn($q) => $q->orderByDesc('created_at'),
-            'payouts' => fn($q) => $q->orderByDesc('created_at'),
+            'payouts' => fn($q) => $q->with('member')->orderByDesc('created_at'),
         ])->findOrFail($id);
 
         $stats = [

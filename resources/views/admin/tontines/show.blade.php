@@ -131,6 +131,17 @@
                             <dt class="text-gray-500">Commission créateur</dt>
                             <dd class="font-medium text-gray-800">{{ $tontine->creator_percentage ?? 0 }}%</dd>
                         </div>
+                        <div class="flex justify-between">
+                            <dt class="text-gray-500">Inscription membre</dt>
+                            <dd class="font-medium text-gray-800">
+                                @if($tontine->requires_member_registration ?? false)
+                                    <span class="text-amber-600"><i class="fas fa-user-check mr-1"></i>Obligatoire</span>
+                                    <span class="text-xs text-gray-500 block">(nom, prénom, pièce d'identité)</span>
+                                @else
+                                    <span class="text-gray-600">Non requise</span>
+                                @endif
+                            </dd>
+                        </div>
                         @if($tontine->max_participants)
                             <div class="flex justify-between">
                                 <dt class="text-gray-500">Max participants</dt>
@@ -190,6 +201,7 @@
                                     <th class="text-left px-4 py-3 font-semibold text-gray-600 rounded-l-lg">Membre</th>
                                     <th class="text-center px-4 py-3 font-semibold text-gray-600">Rang</th>
                                     <th class="text-center px-4 py-3 font-semibold text-gray-600">Statut</th>
+                                    <th class="text-center px-4 py-3 font-semibold text-gray-600">Pièce d'identité</th>
                                     <th class="text-right px-4 py-3 font-semibold text-gray-600 rounded-r-lg">Permissions
                                     </th>
                                 </tr>
@@ -198,7 +210,7 @@
                                 @forelse($tontine->members as $member)
                                     <tr class="hover:bg-purple-50 transition">
                                         <td class="px-4 py-3">
-                                            <p class="font-medium text-gray-800">{{ $member->user->fullname ?? 'Invité' }}</p>
+                                            <p class="font-medium text-gray-800">{{ $member->display_name }}</p>
                                             <p class="text-xs text-gray-500">{{ $member->phone }}</p>
                                         </td>
                                         <td class="px-4 py-3 text-center">
@@ -219,6 +231,16 @@
                                             <span
                                                 class="px-2 py-1 rounded-full text-xs font-semibold {{ $s['class'] }}">{{ $s['label'] }}</span>
                                         </td>
+                                        <td class="px-4 py-3 text-center">
+                                            @if($member->identity_document_path)
+                                                <a href="{{ $member->identity_document_url }}" target="_blank" rel="noopener"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-medium hover:bg-indigo-100 transition">
+                                                    <i class="fas fa-file-pdf"></i> Voir
+                                                </a>
+                                            @else
+                                                <span class="text-gray-400 text-xs">—</span>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-3 text-right">
                                             @if($member->permissions)
                                                 @foreach((array) $member->permissions as $perm => $val)
@@ -236,7 +258,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="text-center py-8 text-gray-400">Aucun membre</td>
+                                        <td colspan="5" class="text-center py-8 text-gray-400">Aucun membre</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -322,8 +344,8 @@
                                         <tr class="hover:bg-gray-50 transition">
                                             <td class="px-4 py-3">
                                                 <p class="font-medium text-gray-800">
-                                                    {{ $payout->tontineMember->user->fullname ?? 'Invité' }}</p>
-                                                <p class="text-xs text-gray-500">{{ $payout->tontineMember->phone ?? '' }}</p>
+                                                    {{ $payout->member?->display_name ?? 'Invité' }}</p>
+                                                <p class="text-xs text-gray-500">{{ $payout->member?->phone ?? '' }}</p>
                                             </td>
                                             <td class="px-4 py-3 text-center">
                                                 <span

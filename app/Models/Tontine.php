@@ -26,6 +26,7 @@ class Tontine extends Model
         'notification_settings',
         'late_fee_amount',
         'max_participants',
+        'requires_member_registration',
         'status',
         'moderation_reason',
     ];

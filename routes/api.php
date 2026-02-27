@@ -49,6 +49,7 @@ Route::middleware('auth:sanctum')->prefix('tontines')->group(function () {
     Route::get('/{id}', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'show'])->where('id', '[0-9]+');
     Route::put('/{id}', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'update'])->where('id', '[0-9]+');
     Route::post('/{id}/members', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'addMember'])->where('id', '[0-9]+');
+    Route::post('/{id}/members/complete-registration', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'completeRegistration'])->where('id', '[0-9]+');
     Route::put('/{id}/ranks', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'setRanks'])->where('id', '[0-9]+');
     Route::put('/{id}/members/{phone}/permissions', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'updateMemberPermissions'])->where('id', '[0-9]+');
     Route::post('/{id}/pay', [\App\Http\Controllers\Api\Tontines\TontinePaymentController::class, 'pay'])->where('id', '[0-9]+');

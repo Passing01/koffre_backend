@@ -78,13 +78,14 @@ class TontineService
 
                 $invitedUser = User::where('phone', $memberData['phone'])->first();
 
+                $requiresReg = (bool) ($tontine->requires_member_registration ?? false);
                 TontineMember::query()->create([
                     'tontine_id' => $tontine->id,
                     'phone' => $memberData['phone'],
                     'user_id' => $invitedUser?->id,
                     'payout_rank' => $memberData['payout_rank'] ?? null,
                     'permissions' => $memberData['permissions'] ?? ['can_view_stats' => true],
-                    'status' => 'pending',
+                    'status' => $requiresReg ? 'pending' : 'accepted',
                 ]);
 
                 if ($invitedUser) {
@@ -141,13 +142,26 @@ class TontineService
             ->with(['members.user:id,fullname,phone', 'user:id,fullname,phone'])
             ->findOrFail($tontineId);
 
-        $isMember = $tontine->members()->where('phone', $user->phone)->exists();
+        $membership = $tontine->members()->where('phone', $user->phone)->first();
+        $isMember = (bool) $membership;
         $isCreator = (int) $tontine->user_id === (int) $user->id;
 
         if (!$isMember && !$isCreator) {
             throw ValidationException::withMessages([
                 'tontine_id' => ['Accès refusé.'],
             ]);
+        }
+
+        // Membre en attente (requires_registration) : pas accès aux détails complets
+        if ($membership && $membership->status === 'pending' && $tontine->requires_member_registration) {
+            return [
+                'tontine' => $tontine->only(['id', 'title', 'amount_per_installment', 'currency']),
+                'registration_required' => true,
+                'message' => 'Complétez votre inscription (nom, prénom, pièce d\'identité) pour accéder aux détails.',
+                'stats' => null,
+                'members_stats' => [],
+                'my_membership' => $membership,
+            ];
         }
 
         $currentCycle = $this->calculateCurrentCycle($tontine);
@@ -162,8 +176,9 @@ class TontineService
             'current_cycle' => $currentCycle,
         ];
 
-        // Member specific stats
-        $membersStats = $tontine->members->map(function ($member) use ($tontine, $currentCycle) {
+        // Member specific stats - fullname visible par tous, identity_document uniquement créateur/admin
+        $isCreatorOrAdmin = $isCreator || $user->is_admin;
+        $membersStats = $tontine->members->map(function ($member) use ($tontine, $currentCycle, $isCreatorOrAdmin) {
             $paidCycles = $tontine->payments()
                 ->where('tontine_member_id', $member->id)
                 ->where('status', 'success')
@@ -174,16 +189,21 @@ class TontineService
                 ->where('status', 'success')
                 ->sum('amount');
 
-            return [
+            $row = [
                 'member_id' => $member->id,
-                'fullname' => $member->user?->fullname ?? 'Invité',
+                'display_name' => $member->display_name,
                 'phone' => $member->phone,
+                'status' => $member->status,
                 'payout_rank' => $member->payout_rank,
                 'paid_cycles_count' => $paidCycles,
                 'attendance_rate' => $currentCycle > 1 ? round(($paidCycles / ($currentCycle - 1)) * 100, 2) : 100,
                 'total_contributed' => $totalAmountPaid,
                 'payout_received' => $tontine->payouts()->where('tontine_member_id', $member->id)->where('status', 'success')->exists(),
             ];
+            if ($isCreatorOrAdmin && $member->identity_document_path) {
+                $row['identity_document_url'] = $member->identity_document_url;
+            }
+            return $row;
         });
 
         return [
@@ -222,13 +242,14 @@ class TontineService
 
         $invitedUser = User::where('phone', $memberData['phone'])->first();
 
+        $requiresReg = (bool) ($tontine->requires_member_registration ?? false);
         $member = TontineMember::query()->updateOrCreate(
             ['tontine_id' => $tontineId, 'phone' => $memberData['phone']],
             [
                 'user_id' => $invitedUser?->id,
                 'payout_rank' => $memberData['payout_rank'] ?? null,
                 'permissions' => $memberData['permissions'] ?? ['can_view_stats' => true],
-                'status' => 'pending',
+                'status' => $requiresReg ? 'pending' : 'accepted',
             ]
         );
 
@@ -241,6 +262,44 @@ class TontineService
         }
 
         return $member;
+    }
+
+    /**
+     * Compléter l'inscription d'un membre en attente (nom, prénom, pièce d'identité).
+     * Le téléphone est déjà connu (récupéré à l'ajout).
+     */
+    public function completeMemberRegistration(int $tontineId, User $user, array $data): TontineMember
+    {
+        $tontine = Tontine::query()->findOrFail($tontineId);
+        $member = TontineMember::where('tontine_id', $tontineId)->where('phone', $user->phone)->firstOrFail();
+
+        if ($member->status !== 'pending' || !$tontine->requires_member_registration) {
+            throw ValidationException::withMessages([
+                'tontine_id' => ['Cette inscription n\'est pas requise ou déjà complétée.'],
+            ]);
+        }
+
+        $identityPath = null;
+        if (!empty($data['identity_document']) && $data['identity_document'] instanceof \Illuminate\Http\UploadedFile) {
+            $identityPath = $data['identity_document']->store('tontines/members/documents', 'public');
+        }
+
+        $member->update([
+            'first_name' => $data['first_name'] ?? null,
+            'last_name' => $data['last_name'] ?? null,
+            'identity_document_path' => $identityPath,
+            'status' => 'accepted',
+        ]);
+
+        $this->auditService->log(
+            action: 'tontine.member_registered',
+            actorUserId: $user->id,
+            auditableType: 'tontine',
+            auditableId: $tontineId,
+            metadata: ['member_id' => $member->id],
+        );
+
+        return $member->fresh();
     }
 
     private function calculateCurrentCycle(Tontine $tontine): int
@@ -302,6 +361,12 @@ class TontineService
     {
         $tontine = Tontine::query()->findOrFail($tontineId);
         $member = TontineMember::where('tontine_id', $tontineId)->where('phone', $user->phone)->firstOrFail();
+
+        if ($member->status !== 'accepted') {
+            throw ValidationException::withMessages([
+                'tontine_id' => ['Vous devez compléter votre inscription avant de contribuer.'],
+            ]);
+        }
 
         if ($tontine->status !== 'active') {
             throw ValidationException::withMessages(['tontine_id' => ['La tontine n\'est pas active.']]);

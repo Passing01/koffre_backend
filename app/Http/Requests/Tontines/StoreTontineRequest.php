@@ -29,6 +29,7 @@ class StoreTontineRequest extends FormRequest
             'notification_settings' => 'nullable|array',
             'late_fee_amount' => 'nullable|numeric|min:0',
             'max_participants' => 'nullable|integer|min:2',
+            'requires_member_registration' => 'nullable|boolean',
             'members' => 'required|array|min:1',
             'members.*.phone' => 'required|string',
             'members.*.payout_rank' => 'nullable|integer|min:1',
