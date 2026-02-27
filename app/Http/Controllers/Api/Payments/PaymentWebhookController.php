@@ -159,12 +159,12 @@ class PaymentWebhookController extends Controller
         // 5. Traitement de l'événement
         $payloadData = $request->all();
 
-        // Notre référence interne est dans les metadata (KOF-... ou TON-...)
-        // La référence GeniusPay native (TXN-...) est dans data.reference mais ne correspond pas à notre système
-        $internalRef = $payloadData['data']['metadata']['transaction_id']
-            ?? $payloadData['data']['metadata']['order_id']
-            ?? $payloadData['data']['reference']   // Dernier recours
-            ?? null;
+        // Notre référence interne (KOF-... ou TON-...) est dans metadata
+        // La référence GeniusPay (SANDBOX_... ou MTX-...) est dans data.reference - utilisée si payment_reference a été écrasé
+        $data = $payloadData['data'] ?? [];
+        $metadata = $data['metadata'] ?? [];
+        $internalRef = $metadata['transaction_id'] ?? $metadata['order_id'] ?? null;
+        $geniuspayRef = $data['reference'] ?? null;
 
         Log::info('GeniusPay Webhook: Référence extraite', [
             'event' => $event,
@@ -178,22 +178,26 @@ class PaymentWebhookController extends Controller
             return response()->json(['success' => true, 'message' => 'Test successful']);
         }
 
-        if (!$internalRef) {
-            Log::warning('GeniusPay Webhook: Référence interne manquante dans le payload');
-            return response()->json(['message' => 'Internal reference missing'], 400);
+        $refs = array_filter([$internalRef, $geniuspayRef]);
+        if (empty($refs)) {
+            Log::warning('GeniusPay Webhook: Aucune référence trouvée dans le payload');
+            return response()->json(['message' => 'Reference missing'], 400);
         }
 
         // Gérer les différents types d'événements
         switch ($event) {
             case 'payment.success':
                 try {
-                    if (str_starts_with($internalRef, 'TON-')) {
+                    if ($internalRef && str_starts_with($internalRef, 'TON-')) {
                         $tontineService = app(\App\Services\Tontines\TontineService::class);
-                        $tontineService->completePayment($internalRef);
-                        return response()->json(['success' => true, 'message' => 'Tontine payment processed']);
+                        $done = $tontineService->completePayment($refs);
+                        return response()->json(['success' => true, 'message' => $done ? 'Tontine payment processed' : 'No matching payment']);
                     }
 
-                    $this->contributionService->complete($internalRef);
+                    $contribution = \App\Models\Contribution::whereIn('payment_reference', $refs)->first();
+                    if ($contribution) {
+                        $this->contributionService->complete($contribution->payment_reference);
+                    }
                     return response()->json(['success' => true, 'message' => 'Contribution payment processed']);
                 } catch (\Exception $e) {
                     Log::error('GeniusPay Webhook Error: ' . $e->getMessage(), [
@@ -212,11 +216,14 @@ class PaymentWebhookController extends Controller
             case 'payment.failed':
             case 'payment.cancelled':
             case 'payment.expired':
-                Log::info('GeniusPay Payment issue', ['event' => $event, 'ref' => $internalRef]);
-                // Marquer la contribution/payment comme échouée
-                $contribution = \App\Models\Contribution::where('payment_reference', $internalRef)->first();
+                Log::info('GeniusPay Payment issue', ['event' => $event, 'refs' => $refs]);
+                $contribution = \App\Models\Contribution::whereIn('payment_reference', $refs)->first();
                 if ($contribution) {
                     $contribution->update(['payment_status' => 'failed']);
+                }
+                $tontinePayment = \App\Models\TontinePayment::whereIn('payment_reference', $refs)->where('status', 'pending')->first();
+                if ($tontinePayment) {
+                    $tontinePayment->update(['status' => 'failed']);
                 }
                 return response()->json(['success' => true, 'message' => 'Event acknowledged']);
 

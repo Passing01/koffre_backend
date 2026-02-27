@@ -60,10 +60,7 @@ class ContributionService
                 ]
             );
 
-            // Update contribution with the external token if needed for IPN
-            $contribution->update([
-                'payment_reference' => $paymentData['payment_token'] ?? $reference
-            ]);
+            // Ne pas écraser payment_reference : le webhook utilise metadata.order_id = notre référence (KOF-xxx)
 
             return [
                 'contribution' => $contribution,

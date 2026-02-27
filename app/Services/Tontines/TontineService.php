@@ -331,9 +331,7 @@ class TontineService
                 ]
             );
 
-            $payment->update([
-                'payment_reference' => $paymentData['payment_token'] ?? $reference
-            ]);
+            // Ne pas écraser payment_reference : le webhook utilise metadata.order_id = notre référence (TON-xxx)
 
             return [
                 'payment' => $payment,
@@ -343,11 +341,16 @@ class TontineService
         });
     }
 
-    public function completePayment(string $reference): bool
+    /**
+     * @param string|array $reference Référence unique ou tableau (notre ref + ref GeniusPay) pour rétrocompatibilité
+     */
+    public function completePayment(string|array $reference): bool
     {
-        return DB::transaction(function () use ($reference) {
+        $refs = is_array($reference) ? array_filter($reference) : [$reference];
+
+        return DB::transaction(function () use ($refs) {
             $payment = \App\Models\TontinePayment::query()
-                ->where('payment_reference', $reference)
+                ->whereIn('payment_reference', $refs)
                 ->where('status', 'pending')
                 ->lockForUpdate()
                 ->first();

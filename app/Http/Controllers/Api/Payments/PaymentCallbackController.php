@@ -45,14 +45,15 @@ class PaymentCallbackController extends Controller
         $redirect = $request->input('redirect');
 
         // Si référence absente, extraire depuis le payload GeniusPay (data.metadata)
-        if (!$reference && $request->has('data.metadata')) {
-            $data = $request->input('data', []);
+        $data = $request->input('data', []);
+        if (!$reference && !empty($data['metadata'])) {
             $metadata = $data['metadata'] ?? [];
             $reference = $metadata['transaction_id'] ?? $metadata['order_id'] ?? null;
             if ($reference) {
                 $provider = 'geniuspay';
             }
         }
+        $geniuspayRef = is_array($data) ? ($data['reference'] ?? null) : null;
 
         Log::info('Payment Callback Received', [
             'event' => $event,
@@ -78,7 +79,7 @@ class PaymentCallbackController extends Controller
 
         try {
             $result = match ($event) {
-                'payment.success' => $this->onPaymentSuccess($reference),
+                'payment.success' => $this->onPaymentSuccess($reference, $geniuspayRef),
                 'payment.failed' => $this->onPaymentFailed($reference),
                 'payment.cancelled' => $this->onPaymentCancelled($reference),
                 'payment.refunded' => $this->onPaymentRefunded($reference),
@@ -114,17 +115,21 @@ class PaymentCallbackController extends Controller
         ]);
     }
 
-    private function onPaymentSuccess(string $reference): array
+    private function onPaymentSuccess(string $reference, ?string $geniuspayRef = null): array
     {
+        $refs = array_filter([$reference, $geniuspayRef]);
+
         if (str_starts_with($reference, 'TON-')) {
-            $this->tontineService->completePayment($reference);
-            return ['message' => 'Cotisation tontine confirmée avec succès.'];
+            $done = $this->tontineService->completePayment($refs);
+            if ($done) {
+                return ['message' => 'Cotisation tontine confirmée avec succès.'];
+            }
         }
 
-        $contribution = Contribution::where('payment_reference', $reference)->first();
+        $contribution = Contribution::whereIn('payment_reference', $refs)->first();
 
         if ($contribution) {
-            $this->contributionService->complete($reference);
+            $this->contributionService->complete($contribution->payment_reference);
             return ['message' => 'Paiement confirmé avec succès.', 'contribution_id' => $contribution->id];
         }
 
