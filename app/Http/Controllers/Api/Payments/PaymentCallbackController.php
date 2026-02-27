@@ -44,6 +44,16 @@ class PaymentCallbackController extends Controller
         $provider = $request->input('provider', 'unknown');
         $redirect = $request->input('redirect');
 
+        // Si référence absente, extraire depuis le payload GeniusPay (data.metadata)
+        if (!$reference && $request->has('data.metadata')) {
+            $data = $request->input('data', []);
+            $metadata = $data['metadata'] ?? [];
+            $reference = $metadata['transaction_id'] ?? $metadata['order_id'] ?? null;
+            if ($reference) {
+                $provider = 'geniuspay';
+            }
+        }
+
         Log::info('Payment Callback Received', [
             'event' => $event,
             'reference' => $reference,
