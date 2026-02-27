@@ -45,7 +45,7 @@ class AuthOtpService
         }
 
         // Production : déléguer l'envoi à Ikoddi
-        $identity = ($countryCode ?: '226') . ltrim($phone, '0');
+        $identity = $this->buildIkoddiIdentity($phone, $countryCode);
 
         $orgId = config('services.ikoddi.organization_id');
         $appId = config('services.ikoddi.otp_app_id');
@@ -140,7 +140,7 @@ class AuthOtpService
         $appId = config('services.ikoddi.otp_app_id');
         $apiKey = config('services.ikoddi.api_key');
 
-        $identity = ($user->country_code ?: '226') . ltrim($user->phone, '0');
+        $identity = $this->buildIkoddiIdentity($user->phone, $user->country_code);
 
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
@@ -179,5 +179,22 @@ class AuthOtpService
         }
 
         return (string) random_int(100000, 999999);
+    }
+
+    /**
+     * Construit l'identity au format attendu par Ikoddi (numérique, sans préfixe BF+).
+     * - Nettoie tout sauf les chiffres
+     * - Si le téléphone commence déjà par l'indicatif, on ne le duplique pas
+     */
+    private function buildIkoddiIdentity(string $phone, ?string $countryCode): string
+    {
+        $digitsPhone = preg_replace('/\D+/', '', $phone) ?? '';
+        $digitsCode = preg_replace('/\D+/', (string) $countryCode) ?: '226';
+
+        if (str_starts_with($digitsPhone, $digitsCode)) {
+            return $digitsPhone;
+        }
+
+        return $digitsCode . $digitsPhone;
     }
 }
