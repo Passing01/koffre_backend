@@ -6,13 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Tontine;
 use App\Models\TontineMember;
 use App\Models\TontinePayment;
+use App\Models\TontinePayoutRequest;
 use App\Services\Audit\AuditService;
+use App\Services\Tontines\TontineService;
 use Illuminate\Http\Request;
 
 class AdminTontineController extends Controller
 {
-    public function __construct(private readonly AuditService $auditService)
-    {
+    public function __construct(
+        private readonly AuditService $auditService,
+        private readonly TontineService $tontineService
+    ) {
     }
 
     public function index(Request $request)
@@ -65,6 +69,7 @@ class AdminTontineController extends Controller
             'members.user',
             'payments' => fn($q) => $q->orderByDesc('created_at'),
             'payouts' => fn($q) => $q->with('member')->orderByDesc('created_at'),
+            'payoutRequests' => fn($q) => $q->where('status', 'pending')->with('beneficiary'),
         ])->findOrFail($id);
 
         $stats = [
@@ -75,7 +80,19 @@ class AdminTontineController extends Controller
             'total_payouts' => $tontine->payouts->where('status', 'success')->sum('amount'),
         ];
 
-        return view('admin.tontines.show', compact('tontine', 'stats'));
+        $expectedCount = $tontine->members()->where('status', 'accepted')->count();
+        $maxCycle = (int) $tontine->payments()->max('cycle_number') ?: 1;
+        $cyclesReadyForPayout = [];
+        for ($c = 1; $c <= $maxCycle; $c++) {
+            $paidCount = $tontine->payments()->where('cycle_number', $c)->where('status', 'success')->count();
+            $beneficiary = $tontine->members()->where('payout_rank', $c)->where('status', 'accepted')->first();
+            $alreadyPaid = $beneficiary && $tontine->payouts()->where('tontine_member_id', $beneficiary->id)->where('cycle_number', $c)->exists();
+            if ($paidCount >= $expectedCount && $beneficiary && !$alreadyPaid) {
+                $cyclesReadyForPayout[] = ['cycle' => $c, 'beneficiary' => $beneficiary->display_name];
+            }
+        }
+
+        return view('admin.tontines.show', compact('tontine', 'stats', 'cyclesReadyForPayout'));
     }
 
     /**
@@ -133,5 +150,22 @@ class AdminTontineController extends Controller
         );
 
         return back()->with('success', 'Tontine réactivée avec succès.');
+    }
+
+    /**
+     * Traiter manuellement le payout d'un cycle (admin).
+     */
+    public function processPayout(Request $request, int $id, int $cycle)
+    {
+        $tontine = Tontine::findOrFail($id);
+
+        try {
+            $this->tontineService->processPayoutByAdmin($id, $cycle, $request->user());
+            return back()->with('success', "Payout du cycle #{$cycle} traité avec succès.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()->withErrors($e->errors());
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
     }
 }

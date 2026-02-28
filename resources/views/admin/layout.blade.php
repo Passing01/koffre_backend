@@ -83,6 +83,12 @@
                     <span>Transactions</span>
                 </a>
 
+                <a href="{{ route('admin.platform-earnings.index') }}"
+                    class="sidebar-link flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.platform-earnings.*') ? 'active' : '' }}">
+                    <i class="fas fa-coins w-5"></i>
+                    <span>Commissions tontine</span>
+                </a>
+
                 <a href="{{ route('admin.audit.index') }}"
                     class="sidebar-link flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.audit.*') ? 'active' : '' }}">
                     <i class="fas fa-history w-5"></i>

@@ -45,6 +45,7 @@ Route::prefix('cagnottes')->group(function () {
 Route::middleware('auth:sanctum')->prefix('tontines')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'index']);
     Route::get('/mine', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'index']);
+    Route::get('/earnings', [\App\Http\Controllers\Api\Tontines\TontineEarningController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'store']);
     Route::get('/{id}', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'show'])->where('id', '[0-9]+');
     Route::put('/{id}', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'update'])->where('id', '[0-9]+');
@@ -53,6 +54,7 @@ Route::middleware('auth:sanctum')->prefix('tontines')->group(function () {
     Route::put('/{id}/ranks', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'setRanks'])->where('id', '[0-9]+');
     Route::put('/{id}/members/{phone}/permissions', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'updateMemberPermissions'])->where('id', '[0-9]+');
     Route::post('/{id}/pay', [\App\Http\Controllers\Api\Tontines\TontinePaymentController::class, 'pay'])->where('id', '[0-9]+');
+    Route::post('/{id}/payout-requests/{cycle}/approve', [\App\Http\Controllers\Api\Tontines\TontinePayoutController::class, 'approve'])->where('id', '[0-9]+')->where('cycle', '[0-9]+');
 });
 
 Route::middleware('auth:sanctum')->get('/my-cagnottes', [CagnotteController::class, 'mine']);

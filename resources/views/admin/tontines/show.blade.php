@@ -225,6 +225,7 @@
                                                     'accepted' => ['label' => 'Accepté', 'class' => 'bg-green-100 text-green-700'],
                                                     'pending' => ['label' => 'En attente', 'class' => 'bg-yellow-100 text-yellow-700'],
                                                     'rejected' => ['label' => 'Rejeté', 'class' => 'bg-red-100 text-red-700'],
+                                                    'blocked' => ['label' => 'Bloqué', 'class' => 'bg-red-200 text-red-800'],
                                                 ];
                                                 $s = $statusMap[$member->status] ?? ['label' => ucfirst($member->status), 'class' => 'bg-gray-100 text-gray-700'];
                                             @endphp
@@ -320,6 +321,58 @@
                         </div>
                     @endif
                 </div>
+
+                {{-- Cycles prêts pour payout (tous ont payé, mode manuel ou en attente) --}}
+                @if(!empty($cyclesReadyForPayout))
+                    <div class="bg-green-50 border border-green-200 rounded-2xl p-6">
+                        <h3 class="text-lg font-bold text-green-900 mb-4">
+                            <i class="fas fa-check-circle text-green-600 mr-2"></i>Cycles prêts pour reversement
+                        </h3>
+                        <p class="text-sm text-green-800 mb-4">Tous les membres ont payé. Cliquez pour traiter le payout.</p>
+                        <div class="space-y-2">
+                            @foreach($cyclesReadyForPayout as $item)
+                                <div class="flex items-center justify-between gap-4 p-3 bg-white rounded-xl border border-green-100">
+                                    <span class="font-medium">Cycle #{{ $item['cycle'] }} → {{ $item['beneficiary'] }}</span>
+                                    <form method="POST" action="{{ route('admin.tontines.process-payout', [$tontine->id, $item['cycle']]) }}" class="inline">
+                                        @csrf
+                                        <button type="submit" class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition">
+                                            <i class="fas fa-play mr-1"></i> Traiter
+                                        </button>
+                                    </form>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Demandes de payout en attente (impayés) --}}
+                @if($tontine->payoutRequests->isNotEmpty())
+                    <div class="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+                        <h3 class="text-lg font-bold text-amber-900 mb-4">
+                            <i class="fas fa-exclamation-triangle text-amber-600 mr-2"></i>Demandes de payout en attente
+                        </h3>
+                        <p class="text-sm text-amber-800 mb-4">Des membres n'ont pas payé. Le créateur peut approuver en bloquant ces membres, ou vous pouvez traiter manuellement.</p>
+                        <div class="space-y-3">
+                            @foreach($tontine->payoutRequests as $req)
+                                <div class="flex items-center justify-between gap-4 p-4 bg-white rounded-xl border border-amber-100">
+                                    <div>
+                                        <p class="font-semibold text-gray-800">Cycle #{{ $req->cycle_number }}</p>
+                                        <p class="text-sm text-gray-600">Bénéficiaire : {{ $req->beneficiary?->display_name ?? '—' }}</p>
+                                        <p class="text-xs text-amber-700 mt-1">
+                                            Impayés : {{ count($req->unpaid_member_ids ?? []) }} membre(s)
+                                        </p>
+                                    </div>
+                                    <form method="POST" action="{{ route('admin.tontines.process-payout', [$tontine->id, $req->cycle_number]) }}" class="inline" onsubmit="return confirm('Traiter le payout du cycle #{{ $req->cycle_number }} ? Les membres impayés ne seront pas bloqués automatiquement.');">
+                                        @csrf
+                                        <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition">
+                                            <i class="fas fa-play mr-1"></i> Traiter le payout
+                                        </button>
+                                    </form>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
                 {{-- Reversements --}}
                 @if($tontine->payouts->isNotEmpty())

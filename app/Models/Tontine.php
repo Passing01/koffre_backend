@@ -59,6 +59,16 @@ class Tontine extends Model
         return $this->hasMany(TontinePayout::class);
     }
 
+    public function payoutRequests(): HasMany
+    {
+        return $this->hasMany(TontinePayoutRequest::class);
+    }
+
+    public function earnings(): HasMany
+    {
+        return $this->hasMany(TontineEarning::class);
+    }
+
     public function getIdentityDocumentUrlAttribute(): ?string
     {
         return $this->identity_document_path ? asset('storage/' . $this->identity_document_path) : null;

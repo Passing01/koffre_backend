@@ -58,8 +58,10 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::get('/tontines/{id}', [\App\Http\Controllers\Web\Admin\AdminTontineController::class, 'show'])->name('admin.tontines.show');
     Route::post('/tontines/{id}/disable', [\App\Http\Controllers\Web\Admin\AdminTontineController::class, 'disable'])->name('admin.tontines.disable');
     Route::post('/tontines/{id}/enable', [\App\Http\Controllers\Web\Admin\AdminTontineController::class, 'enable'])->name('admin.tontines.enable');
+    Route::post('/tontines/{id}/cycle/{cycle}/process-payout', [\App\Http\Controllers\Web\Admin\AdminTontineController::class, 'processPayout'])->name('admin.tontines.process-payout');
 
     Route::get('/transactions', [\App\Http\Controllers\Web\Admin\AdminTransactionController::class, 'index'])->name('admin.transactions.index');
+    Route::get('/platform-earnings', [\App\Http\Controllers\Web\Admin\AdminPlatformEarningController::class, 'index'])->name('admin.platform-earnings.index');
 
     // Audit Logs
     Route::get('/audit', [\App\Http\Controllers\Web\Admin\AdminAuditLogController::class, 'index'])->name('admin.audit.index');

@@ -206,12 +206,27 @@ class TontineService
             return $row;
         });
 
-        return [
+        $result = [
             'tontine' => $tontine,
             'stats' => $stats,
             'members_stats' => $membersStats,
             'my_membership' => $tontine->members()->where('phone', $user->phone)->first(),
         ];
+
+        if ($isCreator) {
+            $result['pending_payout_requests'] = $tontine->payoutRequests()
+                ->where('status', 'pending')
+                ->with('beneficiary')
+                ->get()
+                ->map(fn ($r) => [
+                    'cycle_number' => $r->cycle_number,
+                    'amount' => (float) $r->amount,
+                    'unpaid_member_ids' => $r->unpaid_member_ids ?? [],
+                    'beneficiary' => $r->beneficiary ? ['id' => $r->beneficiary->id, 'display_name' => $r->beneficiary->display_name] : null,
+                ]);
+        }
+
+        return $result;
     }
 
     public function updateMemberPermissions(int $tontineId, User $user, string $memberPhone, array $permissions): TontineMember
@@ -362,6 +377,11 @@ class TontineService
         $tontine = Tontine::query()->findOrFail($tontineId);
         $member = TontineMember::where('tontine_id', $tontineId)->where('phone', $user->phone)->firstOrFail();
 
+        if ($member->status === 'blocked') {
+            throw ValidationException::withMessages([
+                'tontine_id' => ['Vous êtes bloqué et ne pouvez plus participer à cette tontine.'],
+            ]);
+        }
         if ($member->status !== 'accepted') {
             throw ValidationException::withMessages([
                 'tontine_id' => ['Vous devez compléter votre inscription avant de contribuer.'],
@@ -375,19 +395,26 @@ class TontineService
         $cycle = $this->calculateCurrentCycle($tontine);
         $reference = 'TON-' . \Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(12));
 
-        return DB::transaction(function () use ($tontine, $member, $cycle, $reference, $user) {
+        $baseAmount = (float) $tontine->amount_per_installment;
+        $feeRate = (float) config('services.platform.tontine_payment_fee_rate', 0.045);
+        $platformFee = round($baseAmount * $feeRate, 2);
+        $totalCharged = $baseAmount + $platformFee;
+
+        return DB::transaction(function () use ($tontine, $member, $cycle, $reference, $user, $baseAmount, $platformFee, $totalCharged) {
             $payment = \App\Models\TontinePayment::query()->create([
                 'tontine_id' => $tontine->id,
                 'tontine_member_id' => $member->id,
-                'amount' => $tontine->amount_per_installment,
                 'cycle_number' => $cycle,
+                'amount' => $baseAmount,
+                'platform_fee' => $platformFee,
+                'total_charged' => $totalCharged,
                 'payment_reference' => $reference,
                 'status' => 'pending',
             ]);
 
             $paymentData = $this->paymentService->initiatePayment(
                 transactionId: $reference,
-                amount: (float) $tontine->amount_per_installment,
+                amount: (float) $totalCharged,
                 currency: $tontine->currency ?? 'XOF',
                 description: "Cotisation Tontine: {$tontine->title} - Cycle #{$cycle}",
                 customer: [
@@ -427,6 +454,18 @@ class TontineService
             $payment->update(['status' => 'success']);
             $tontine = $payment->tontine;
 
+            // Enregistrer la commission plateforme (4,5%) à la contribution
+            if ($payment->platform_fee > 0) {
+                \App\Models\TontineEarning::query()->create([
+                    'tontine_id' => $tontine->id,
+                    'user_id' => null,
+                    'type' => \App\Models\TontineEarning::TYPE_PLATFORM_FEE,
+                    'amount' => $payment->platform_fee,
+                    'tontine_payment_id' => $payment->id,
+                    'reference' => 'PAY-FEE-' . $payment->payment_reference,
+                ]);
+            }
+
             $this->auditService->log(
                 action: 'tontine.payment_completed',
                 actorUserId: $payment->member?->user_id,
@@ -459,14 +498,12 @@ class TontineService
     {
         // 1. Check if everyone in this cycle has paid
         $expectedCount = $tontine->members()->where('status', 'accepted')->count();
-        $paidCount = $tontine->payments()
+        $paidMemberIds = $tontine->payments()
             ->where('cycle_number', $cycle)
             ->where('status', 'success')
-            ->count();
-
-        if ($paidCount < $expectedCount) {
-            return; // Not everyone paid yet
-        }
+            ->pluck('tontine_member_id')
+            ->toArray();
+        $paidCount = count($paidMemberIds);
 
         // 2. Find the member who should receive the payout for this cycle
         // Rank matches cycle (Cycle 1 -> Rank 1, etc.)
@@ -490,46 +527,160 @@ class TontineService
             return;
         }
 
-        // 4. Create Payout Record
-        $totalAmount = $tontine->payments()->where('cycle_number', $cycle)->sum('amount');
-        $commission = $totalAmount * ($tontine->creator_percentage / 100);
-        $netAmount = $totalAmount - $commission;
+        $totalAmount = (float) $tontine->payments()->where('cycle_number', $cycle)->where('status', 'success')->sum('amount');
+        $creatorPct = (float) ($tontine->creator_percentage ?? 0);
+        $platformPct = (float) config('services.platform.tontine_payout_commission_rate', 0.01);
+        $creatorAmount = round($totalAmount * ($creatorPct / 100), 2);
+        $platformAmount = round($totalAmount * $platformPct, 2);
+        $beneficiaryAmount = $totalAmount - $creatorAmount - $platformAmount;
+        $paidCount = count($paidMemberIds);
 
-        DB::transaction(function () use ($tontine, $beneficiary, $cycle, $netAmount, $commission) {
+        if ($paidCount < $expectedCount) {
+            $unpaidMemberIds = $tontine->members()
+                ->where('status', 'accepted')
+                ->whereNotIn('id', $paidMemberIds)
+                ->pluck('id')
+                ->toArray();
+
+            $unpaidNames = $tontine->members()->whereIn('id', $unpaidMemberIds)->get()->map(fn ($m) => $m->display_name)->join(', ');
+
+            \App\Models\TontinePayoutRequest::query()->firstOrCreate(
+                ['tontine_id' => $tontine->id, 'cycle_number' => $cycle],
+                [
+                    'tontine_member_id' => $beneficiary->id,
+                    'amount' => $beneficiaryAmount,
+                    'unpaid_member_ids' => $unpaidMemberIds,
+                    'status' => 'pending',
+                ]
+            );
+
+            $msg = "Cycle #{$cycle} : {$unpaidNames} n'ont pas encore payé. Le créateur peut approuver le transfert en acceptant de bloquer ces membres.";
+            if ($tontine->user) {
+                $this->fcmService->sendToUser($tontine->user, "Tontine - Cycle #{$cycle} en attente", $msg);
+            }
+            foreach (User::where('is_admin', true)->get() as $admin) {
+                $this->fcmService->sendToUser($admin, "Tontine - Cycle #{$cycle} en attente", $msg);
+            }
+            return;
+        }
+
+        if ($tontine->payout_mode === 'automatic') {
+            $this->executePayout($tontine, $beneficiary, $cycle, $beneficiaryAmount, $creatorAmount, $platformAmount, $totalAmount);
+        }
+    }
+
+    private function executePayout(Tontine $tontine, TontineMember $beneficiary, int $cycle, float $beneficiaryAmount, float $creatorAmount, float $platformAmount, float $totalAmount): void
+    {
+        DB::transaction(function () use ($tontine, $beneficiary, $cycle, $beneficiaryAmount, $creatorAmount, $platformAmount, $totalAmount) {
             $payout = \App\Models\TontinePayout::query()->create([
                 'tontine_id' => $tontine->id,
                 'tontine_member_id' => $beneficiary->id,
-                'amount' => $netAmount,
                 'cycle_number' => $cycle,
-                'status' => 'pending', // Will be marked success after payment service call
+                'amount' => $beneficiaryAmount,
+                'creator_amount' => $creatorAmount,
+                'platform_amount' => $platformAmount,
+                'status' => 'pending',
             ]);
 
-            // 5. Trigger Payout if automatic
-            if ($tontine->payout_mode === 'automatic') {
-                try {
-                    $payoutAccount = $beneficiary->user?->phone ?? $beneficiary->phone;
-                    $success = $this->paymentService->payout(
-                        account: $payoutAccount,
-                        amount: (float) $netAmount,
-                        description: "Versement Tontine: {$tontine->title} - Cycle #{$cycle}",
-                        method: 'orange' // Fallback or use user's preferred method
-                    );
+            $ref = 'TON-PAY-' . $tontine->id . '-' . $cycle;
+            $beneficiaryAccount = $beneficiary->user?->phone ?? $beneficiary->phone;
+            $success = $this->paymentService->payout(
+                account: $beneficiaryAccount,
+                amount: (float) $beneficiaryAmount,
+                description: "Versement Tontine: {$tontine->title} - Cycle #{$cycle}",
+                method: null
+            );
 
-                    if ($success) {
-                        $payout->update(['status' => 'success', 'paid_at' => now()]);
+            if ($success && $creatorAmount > 0 && $tontine->user?->phone) {
+                $this->paymentService->payout(
+                    account: $tontine->user->phone,
+                    amount: (float) $creatorAmount,
+                    description: "Commission créateur - Tontine {$tontine->title} - Cycle #{$cycle}",
+                    method: null
+                );
+                \App\Models\TontineEarning::query()->create([
+                    'tontine_id' => $tontine->id,
+                    'user_id' => $tontine->user_id,
+                    'type' => \App\Models\TontineEarning::TYPE_CREATOR_COMMISSION,
+                    'amount' => $creatorAmount,
+                    'tontine_payout_id' => $payout->id,
+                    'reference' => $ref . '-creator',
+                ]);
+            }
 
-                        if ($beneficiary->user) {
-                            $this->fcmService->sendToUser(
-                                $beneficiary->user,
-                                "Tontine reçue !",
-                                "Félicitations ! Vous avez reçu votre part de la tontine '{$tontine->title}' pour un montant de {$netAmount} XOF."
-                            );
-                        }
-                    }
-                } catch (\Exception $e) {
-                    Log::error("Tontine Payout Failed: " . $e->getMessage());
+            if ($success && $platformAmount > 0) {
+                $platformPhone = config('services.platform.payout_phone');
+                if ($platformPhone) {
+                    $this->paymentService->payout(account: $platformPhone, amount: (float) $platformAmount, description: "Commission plateforme - Tontine {$tontine->title} - Cycle #{$cycle}", method: null);
+                }
+                \App\Models\TontineEarning::query()->create([
+                    'tontine_id' => $tontine->id,
+                    'user_id' => null,
+                    'type' => \App\Models\TontineEarning::TYPE_PLATFORM_FEE,
+                    'amount' => $platformAmount,
+                    'tontine_payout_id' => $payout->id,
+                    'reference' => $ref . '-platform',
+                ]);
+            }
+
+            if ($success) {
+                $payout->update(['status' => 'success', 'paid_at' => now()]);
+                if ($beneficiary->user) {
+                    $this->fcmService->sendToUser($beneficiary->user, "Tontine reçue !", "Félicitations ! Vous avez reçu votre part de la tontine '{$tontine->title}' pour un montant de {$beneficiaryAmount} XOF.");
                 }
             }
         });
+    }
+
+    public function approvePayoutWithBlocking(int $tontineId, int $cycle, User $creator): void
+    {
+        $tontine = Tontine::query()->findOrFail($tontineId);
+        if ((int) $tontine->user_id !== (int) $creator->id) {
+            throw ValidationException::withMessages(['tontine_id' => ['Seul le créateur peut approuver.']]);
+        }
+
+        $request = \App\Models\TontinePayoutRequest::query()->where('tontine_id', $tontineId)->where('cycle_number', $cycle)->where('status', 'pending')->firstOrFail();
+        $beneficiary = $request->beneficiary;
+        $unpaidIds = $request->unpaid_member_ids ?? [];
+
+        DB::transaction(function () use ($request, $tontine, $beneficiary, $cycle, $unpaidIds, $creator) {
+            TontineMember::query()->whereIn('id', $unpaidIds)->update(['status' => 'blocked']);
+
+            $totalAmount = (float) $tontine->payments()->where('cycle_number', $cycle)->where('status', 'success')->sum('amount');
+            $creatorPct = (float) ($tontine->creator_percentage ?? 0);
+            $platformPct = (float) config('services.platform.tontine_payout_commission_rate', 0.01);
+            $creatorAmount = round($totalAmount * ($creatorPct / 100), 2);
+            $platformAmount = round($totalAmount * $platformPct, 2);
+            $beneficiaryAmount = $totalAmount - $creatorAmount - $platformAmount;
+
+            $this->executePayout($tontine, $beneficiary, $cycle, $beneficiaryAmount, $creatorAmount, $platformAmount, $totalAmount);
+
+            $request->update(['status' => 'approved', 'approved_by_user_id' => $creator->id, 'approved_at' => now()]);
+
+            $this->auditService->log(action: 'tontine.payout_approved_with_blocking', actorUserId: $creator->id, auditableType: 'tontine', auditableId: $tontine->id, metadata: ['cycle' => $cycle, 'blocked_members' => $unpaidIds]);
+        });
+    }
+
+    public function processPayoutByAdmin(int $tontineId, int $cycle, User $adminUser): void
+    {
+        $tontine = Tontine::query()->findOrFail($tontineId);
+        if (!$adminUser->is_admin) {
+            throw ValidationException::withMessages(['tontine_id' => ['Non autorisé.']]);
+        }
+
+        $beneficiary = $tontine->members()->where('payout_rank', $cycle)->where('status', 'accepted')->firstOrFail();
+
+        if ($tontine->payouts()->where('tontine_member_id', $beneficiary->id)->where('cycle_number', $cycle)->exists()) {
+            throw ValidationException::withMessages(['cycle' => ['Ce cycle a déjà été reversé.']]);
+        }
+
+        $totalAmount = (float) $tontine->payments()->where('cycle_number', $cycle)->where('status', 'success')->sum('amount');
+        $creatorPct = (float) ($tontine->creator_percentage ?? 0);
+        $platformPct = (float) config('services.platform.tontine_payout_commission_rate', 0.01);
+        $creatorAmount = round($totalAmount * ($creatorPct / 100), 2);
+        $platformAmount = round($totalAmount * $platformPct, 2);
+        $beneficiaryAmount = $totalAmount - $creatorAmount - $platformAmount;
+
+        $this->executePayout($tontine, $beneficiary, $cycle, $beneficiaryAmount, $creatorAmount, $platformAmount, $totalAmount);
     }
 }

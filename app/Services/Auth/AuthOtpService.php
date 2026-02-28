@@ -89,7 +89,7 @@ class AuthOtpService
         });
     }
 
-    public function verifyOtp(string $phone, string $otpCode): array
+    public function verifyOtp(string $phone, string $otpCode, bool $forWeb = false): array
     {
         $user = User::query()->where('phone', $phone)->first();
 
@@ -120,19 +120,7 @@ class AuthOtpService
                 ]);
             }
 
-            return DB::transaction(function () use ($user) {
-                $user->is_verified = true;
-                $user->otp_code = null;
-                $user->otp_expires_at = null;
-                $user->save();
-
-                $token = $user->createToken('mobile')->plainTextToken;
-
-                return [
-                    'token' => $token,
-                    'user' => $user->fresh(),
-                ];
-            });
+            return $this->completeVerification($user, $forWeb);
         }
 
         // Production : déléguer la vérification à Ikoddi
@@ -157,19 +145,36 @@ class AuthOtpService
             ]);
         }
 
-        return DB::transaction(function () use ($user) {
+        return $this->completeVerification($user, $forWeb);
+    }
+
+    /**
+     * Finalise la vérification OTP : nettoie le code et retourne token + user (ou user seul si forWeb).
+     */
+    private function completeVerification(User $user, bool $forWeb): array
+    {
+        return DB::transaction(function () use ($user, $forWeb) {
             $user->is_verified = true;
             $user->otp_code = null;
             $user->otp_expires_at = null;
             $user->save();
 
-            $token = $user->createToken('mobile')->plainTextToken;
-
-            return [
-                'token' => $token,
-                'user' => $user->fresh(),
-            ];
+            $result = ['user' => $user->fresh()];
+            if (!$forWeb) {
+                $result['token'] = $user->createToken('mobile')->plainTextToken;
+            }
+            return $result;
         });
+    }
+
+    /**
+     * Vérifie l'OTP et retourne l'utilisateur (sans créer de token Sanctum).
+     * Utilisé pour la connexion Admin (session web).
+     */
+    public function verifyOtpForWeb(string $phone, string $otpCode): User
+    {
+        $result = $this->verifyOtp($phone, $otpCode, forWeb: true);
+        return $result['user'];
     }
 
     private function generateOtpCode(): string

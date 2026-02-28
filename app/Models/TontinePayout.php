@@ -15,6 +15,8 @@ class TontinePayout extends Model
         'tontine_member_id',
         'cycle_number',
         'amount',
+        'creator_amount',
+        'platform_amount',
         'status',
         'paid_at',
         'payout_reference',
@@ -22,6 +24,8 @@ class TontinePayout extends Model
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'creator_amount' => 'decimal:2',
+        'platform_amount' => 'decimal:2',
         'paid_at' => 'datetime',
     ];
 

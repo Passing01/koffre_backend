@@ -4,11 +4,16 @@ namespace App\Http\Controllers\Web\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Auth\AuthOtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class AdminAuthController extends Controller
 {
+    public function __construct(private readonly AuthOtpService $authOtpService)
+    {
+    }
+
     public function showLoginForm()
     {
         return view('admin.auth.login');
@@ -26,22 +31,15 @@ class AdminAuthController extends Controller
             return back()->withErrors(['phone' => 'Utilisateur non autorisé.']);
         }
 
-        // Générer un code OTP
-        $otpCode = config('otp.test_mode') ? config('otp.fixed_code') : rand(100000, 999999);
-
-        $user->update([
-            'otp_code' => $otpCode,
-            'otp_expires_at' => now()->addMinutes(10),
-        ]);
-
-        // En mode test, afficher le code
-        if (config('otp.test_mode')) {
-            session()->flash('otp_code', $otpCode);
-        }
+        $this->authOtpService->sendOtp(
+            phone: $request->phone,
+            fullname: null,
+            countryCode: $user->country_code ?? '226',
+        );
 
         session(['phone' => $request->phone]);
 
-        return redirect()->route('admin.verify-otp')->with('success', 'Code OTP envoyé.');
+        return redirect()->route('admin.verify-otp')->with('success', 'Code OTP envoyé par SMS.');
     }
 
     public function showVerifyForm()
@@ -64,31 +62,23 @@ class AdminAuthController extends Controller
             return redirect()->route('admin.login')->withErrors(['error' => 'Session expirée.']);
         }
 
-        $user = User::where('phone', $phone)
-            ->where('is_admin', true)
-            ->first();
+        $user = User::where('phone', $phone)->where('is_admin', true)->first();
 
         if (!$user) {
             return back()->withErrors(['otp_code' => 'Utilisateur non trouvé.']);
         }
 
-        if ($user->otp_code !== $request->otp_code) {
-            return back()->withErrors(['otp_code' => 'Code OTP invalide.']);
+        try {
+            $user = $this->authOtpService->verifyOtpForWeb($phone, $request->otp_code);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()->withErrors($e->errors());
         }
 
-        if ($user->otp_expires_at < now()) {
-            return back()->withErrors(['otp_code' => 'Code OTP expiré.']);
+        if (!$user->is_admin) {
+            return back()->withErrors(['otp_code' => 'Utilisateur non autorisé.']);
         }
 
-        // Connexion de l'utilisateur
         Auth::login($user);
-
-        // Nettoyer l'OTP
-        $user->update([
-            'otp_code' => null,
-            'otp_expires_at' => null,
-        ]);
-
         session()->forget('phone');
 
         return redirect()->route('admin.dashboard')->with('success', 'Connexion réussie !');

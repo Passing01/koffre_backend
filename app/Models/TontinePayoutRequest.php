@@ -2,33 +2,26 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class TontinePayment extends Model
+class TontinePayoutRequest extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'tontine_id',
         'tontine_member_id',
         'cycle_number',
         'amount',
-        'platform_fee',
-        'total_charged',
-        'late_fee_paid',
+        'unpaid_member_ids',
         'status',
-        'paid_at',
-        'payment_reference',
+        'approved_by_user_id',
+        'approved_at',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
-        'platform_fee' => 'decimal:2',
-        'total_charged' => 'decimal:2',
-        'late_fee_paid' => 'decimal:2',
-        'paid_at' => 'datetime',
+        'unpaid_member_ids' => 'array',
+        'approved_at' => 'datetime',
     ];
 
     public function tontine(): BelongsTo
@@ -36,8 +29,13 @@ class TontinePayment extends Model
         return $this->belongsTo(Tontine::class);
     }
 
-    public function member(): BelongsTo
+    public function beneficiary(): BelongsTo
     {
         return $this->belongsTo(TontineMember::class, 'tontine_member_id');
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by_user_id');
     }
 }
