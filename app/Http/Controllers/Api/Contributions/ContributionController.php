@@ -30,7 +30,9 @@ class ContributionController extends Controller
 
         return response()->json([
             'message' => 'Paiement initialisé.',
-            'data' => $result,
+            'contribution' => $result['contribution'],
+            'payment_url' => $result['payment_url'],
+            'payment_token' => $result['payment_token'],
         ], 201);
     }
 

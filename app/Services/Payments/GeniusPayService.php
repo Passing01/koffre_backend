@@ -53,28 +53,28 @@ class GeniusPayService implements PaymentServiceInterface
         $errorUrl = route('payment.callback', ['reference' => $transactionId, 'event' => 'payment.cancelled', 'provider' => 'geniuspay']);
 
         $payload = [
-                    'amount' => (int) $amount,
-                    'currency' => $currency,
-                    'description' => $description,
-                    'success_url' => $successUrl,
-                    'error_url' => $errorUrl,
-                    'customer' => [
-                        'name' => $customer['name'] ?? 'Kofre User',
-                        'email' => $customer['email'] ?? 'user@kofre.com',
-                        'phone' => $customer['phone'] ?? '',
-                    ],
-                    'metadata' => [
-                        'transaction_id' => $transactionId,  // Notre référence interne (KOF-... ou TON-...)
-                        'order_id' => $transactionId,         // Alias pour compatibilité avec le payload webhook
-                    ],
-                ];
+            'amount' => (int) $amount,
+            'currency' => $currency,
+            'description' => $description,
+            'success_url' => $successUrl,
+            'error_url' => $errorUrl,
+            'customer' => [
+                'name' => $customer['name'] ?? 'Kofre User',
+                'email' => $customer['email'] ?? 'user@kofre.com',
+                'phone' => $customer['phone'] ?? '',
+            ],
+            'metadata' => [
+                'transaction_id' => $transactionId,  // Notre référence interne (KOF-... ou TON-...)
+                'order_id' => $transactionId,         // Alias pour compatibilité avec le payload webhook
+            ],
+        ];
         if ($this->defaultMethod !== null) {
             $payload['payment_method'] = $this->defaultMethod;
         }
 
         Log::info('GeniusPay Initiate Payment', [
-            'success_url' => $successUrl,
-            'error_url' => $errorUrl,
+            'reference' => $transactionId,
+            'payload' => $payload,
         ]);
 
         $response = Http::withHeaders([
@@ -83,6 +83,12 @@ class GeniusPayService implements PaymentServiceInterface
             'Accept' => 'application/json',
             'Content-Type' => 'application/json',
         ])->post("{$this->baseUrl}/payments", $payload);
+
+        Log::info('GeniusPay Response', [
+            'reference' => $transactionId,
+            'status' => $response->status(),
+            'body' => $response->json(),
+        ]);
 
         if ($response->failed()) {
             Log::error('GeniusPay Payment Initialization Failed', [
