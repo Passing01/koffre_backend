@@ -218,7 +218,7 @@ class TontineService
                 ->where('status', 'pending')
                 ->with('beneficiary')
                 ->get()
-                ->map(fn ($r) => [
+                ->map(fn($r) => [
                     'cycle_number' => $r->cycle_number,
                     'amount' => (float) $r->amount,
                     'unpaid_member_ids' => $r->unpaid_member_ids ?? [],
@@ -419,6 +419,7 @@ class TontineService
                 description: "Cotisation Tontine: {$tontine->title} - Cycle #{$cycle}",
                 customer: [
                     'name' => $user->fullname,
+                    'email' => "user-{$user->id}@kofre.com",
                     'phone' => $user->phone,
                 ]
             );
@@ -542,7 +543,7 @@ class TontineService
                 ->pluck('id')
                 ->toArray();
 
-            $unpaidNames = $tontine->members()->whereIn('id', $unpaidMemberIds)->get()->map(fn ($m) => $m->display_name)->join(', ');
+            $unpaidNames = $tontine->members()->whereIn('id', $unpaidMemberIds)->get()->map(fn($m) => $m->display_name)->join(', ');
 
             \App\Models\TontinePayoutRequest::query()->firstOrCreate(
                 ['tontine_id' => $tontine->id, 'cycle_number' => $cycle],

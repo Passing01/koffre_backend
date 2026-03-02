@@ -56,6 +56,7 @@ class ContributionService
                 description: "Contribution à la cagnotte: {$cagnotte->title}",
                 customer: [
                     'name' => $actor?->fullname ?? $contributorName ?? 'Invité',
+                    'email' => $actor?->email ?? 'guest@kofre.com',
                     'phone' => $actor?->phone ?? '',
                 ]
             );
