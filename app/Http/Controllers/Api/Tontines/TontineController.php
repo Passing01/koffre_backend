@@ -121,4 +121,14 @@ class TontineController extends Controller
             'data' => $member,
         ]);
     }
+
+    public function close($id, Request $request): JsonResponse
+    {
+        $tontine = $this->tontineService->close((int) $id, $request->user());
+
+        return response()->json([
+            'message' => 'Tontine clôturée avec succès.',
+            'data' => $tontine,
+        ]);
+    }
 }

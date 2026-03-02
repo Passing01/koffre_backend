@@ -51,7 +51,7 @@ class TontineService
         return DB::transaction(function () use ($user, $data) {
             $data['user_id'] = $user->id;
 
-            $members = $data['members'] ?? [];
+            $membersData = $data['members'] ?? [];
             unset($data['members']);
 
             if (isset($data['identity_document'])) {
@@ -59,34 +59,39 @@ class TontineService
                 unset($data['identity_document']);
             }
 
+            /** @var Tontine $tontine */
             $tontine = Tontine::query()->create($data);
 
-            // Add the creator as the first member with high permissions usually
-            TontineMember::query()->create([
+            // Add the creator
+            $creatorMember = TontineMember::query()->create([
                 'tontine_id' => $tontine->id,
                 'phone' => $user->phone,
                 'user_id' => $user->id,
                 'status' => 'accepted',
-                'payout_rank' => 1,
+                'payout_rank' => $tontine->is_random_payout ? null : 1,
                 'permissions' => ['is_admin' => true, 'can_invite' => true, 'can_view_stats' => true],
             ]);
 
-            foreach ($members as $memberData) {
+            $createdMembers = collect([$creatorMember]);
+
+            foreach ($membersData as $m) {
                 // Skip if it's the creator's phone
-                if ($memberData['phone'] === $user->phone)
+                if ($m['phone'] === $user->phone)
                     continue;
 
-                $invitedUser = User::where('phone', $memberData['phone'])->first();
-
+                $invitedUser = User::where('phone', $m['phone'])->first();
                 $requiresReg = (bool) ($tontine->requires_member_registration ?? false);
-                TontineMember::query()->create([
+
+                $newMember = TontineMember::query()->create([
                     'tontine_id' => $tontine->id,
-                    'phone' => $memberData['phone'],
+                    'phone' => $m['phone'],
                     'user_id' => $invitedUser?->id,
-                    'payout_rank' => $memberData['payout_rank'] ?? null,
-                    'permissions' => $memberData['permissions'] ?? ['can_view_stats' => true],
+                    'payout_rank' => $tontine->is_random_payout ? null : ($m['payout_rank'] ?? null),
+                    'permissions' => $m['permissions'] ?? ['can_view_stats' => true],
                     'status' => $requiresReg ? 'pending' : 'accepted',
                 ]);
+
+                $createdMembers->push($newMember);
 
                 if ($invitedUser) {
                     $this->fcmService->sendToUser(
@@ -94,6 +99,25 @@ class TontineService
                         "Invitation Tontine",
                         "{$user->fullname} vous a invité à rejoindre la tontine '{$tontine->title}'."
                     );
+                }
+            }
+
+            // Handle Randomization
+            if ($tontine->is_random_payout) {
+                $shuffledIds = $createdMembers->pluck('id')->shuffle();
+                foreach ($shuffledIds as $index => $memberId) {
+                    $rank = $index + 1;
+                    TontineMember::where('id', $memberId)->update(['payout_rank' => $rank]);
+
+                    // Notify member of their rank
+                    $member = TontineMember::with('user')->find($memberId);
+                    if ($member && $member->user) {
+                        $this->fcmService->sendToUser(
+                            $member->user,
+                            "Tour de prise défini",
+                            "Le tirage au sort a été effectué ! Votre rang de passage pour la tontine '{$tontine->title}' est le #{$rank}."
+                        );
+                    }
                 }
             }
 
@@ -105,7 +129,8 @@ class TontineService
                 metadata: [
                     'amount' => $tontine->amount_per_installment,
                     'frequency' => $tontine->frequency,
-                    'members_count' => count($members) + 1,
+                    'is_random' => $tontine->is_random_payout,
+                    'members_count' => $createdMembers->count(),
                 ],
             );
 
@@ -213,7 +238,19 @@ class TontineService
             'my_membership' => $tontine->members()->where('phone', $user->phone)->first(),
         ];
 
-        if ($isCreator) {
+        if ($isCreatorOrAdmin) {
+            $result['payments'] = $tontine->payments()
+                ->with('member.user:id,fullname,phone')
+                ->where('status', 'success')
+                ->orderByDesc('id')
+                ->get();
+
+            $result['payouts'] = $tontine->payouts()
+                ->with('member.user:id,fullname,phone')
+                ->where('status', 'success')
+                ->orderByDesc('id')
+                ->get();
+
             $result['pending_payout_requests'] = $tontine->payoutRequests()
                 ->where('status', 'pending')
                 ->with('beneficiary')
@@ -227,6 +264,43 @@ class TontineService
         }
 
         return $result;
+    }
+
+    public function close(int $tontineId, User $user): Tontine
+    {
+        $tontine = Tontine::query()->findOrFail($tontineId);
+
+        if ((int) $tontine->user_id !== (int) $user->id) {
+            throw ValidationException::withMessages([
+                'tontine_id' => ['Seul le créateur peut clôturer cette tontine.'],
+            ]);
+        }
+
+        if ($tontine->status === 'closed') {
+            return $tontine;
+        }
+
+        // Check if all members have received their payout
+        $acceptedMembersCount = $tontine->members()->where('status', 'accepted')->count();
+        $payoutsCount = $tontine->payouts()->where('status', 'success')->count();
+
+        if ($payoutsCount < $acceptedMembersCount) {
+            throw ValidationException::withMessages([
+                'tontine_id' => ["La tontine ne peut être clôturée que si tous les membres ({$acceptedMembersCount}) ont reçu leur virement. Actuellement: {$payoutsCount}."],
+            ]);
+        }
+
+        $tontine->update(['status' => 'closed']);
+
+        $this->auditService->log(
+            action: 'tontine.closed',
+            actorUserId: $user->id,
+            auditableType: 'tontine',
+            auditableId: $tontine->id,
+            metadata: ['status' => 'closed'],
+        );
+
+        return $tontine;
     }
 
     public function updateMemberPermissions(int $tontineId, User $user, string $memberPhone, array $permissions): TontineMember
@@ -341,7 +415,9 @@ class TontineService
                 break;
         }
 
-        return (int) floor($diff / $tontine->frequency_number) + 1;
+        $cycle = (int) floor($diff / $tontine->frequency_number) + 1;
+
+        return $cycle;
     }
 
     public function setRanks(int $tontineId, User $user, array $ranks): void
@@ -507,14 +583,19 @@ class TontineService
         $paidCount = count($paidMemberIds);
 
         // 2. Find the member who should receive the payout for this cycle
-        // Rank matches cycle (Cycle 1 -> Rank 1, etc.)
+        // Rank matches cycle modulo total accepted members.
+        // Example with 5 members: Cycle 1 -> Rank 1, Cycle 5 -> Rank 5, Cycle 6 -> Rank 1.
+        $rankToFind = $cycle % $expectedCount;
+        if ($rankToFind === 0)
+            $rankToFind = $expectedCount;
+
         $beneficiary = $tontine->members()
-            ->where('payout_rank', $cycle)
+            ->where('payout_rank', $rankToFind)
             ->where('status', 'accepted')
             ->first();
 
         if (!$beneficiary) {
-            Log::warning("No beneficiary found for Tontine {$tontine->id} Cycle {$cycle} (Rank {$cycle})");
+            Log::warning("No beneficiary found for Tontine {$tontine->id} Cycle {$cycle} (Rank {$rankToFind})");
             return;
         }
 
@@ -628,6 +709,18 @@ class TontineService
                 $payout->update(['status' => 'success', 'paid_at' => now()]);
                 if ($beneficiary->user) {
                     $this->fcmService->sendToUser($beneficiary->user, "Tontine reçue !", "Félicitations ! Vous avez reçu votre part de la tontine '{$tontine->title}' pour un montant de {$beneficiaryAmount} XOF.");
+                }
+
+                // If this was the last person in a full cycle, inform admin/creator that it restarts
+                $acceptedMembersCount = $tontine->members()->where('status', 'accepted')->count();
+                if ($cycle % $acceptedMembersCount === 0) {
+                    $msg = "La tontine '{$tontine->title}' vient de terminer un cycle complet (Cycle #{$cycle}). Elle recommencera automatiquement pour le prochain tour sauf si vous décidez de la clôturer.";
+                    if ($tontine->user) {
+                        $this->fcmService->sendToUser($tontine->user, "Cycle Tontine Terminé", $msg);
+                    }
+                    foreach (User::where('is_admin', true)->get() as $admin) {
+                        $this->fcmService->sendToUser($admin, "Cycle Tontine Terminé", $msg);
+                    }
                 }
             }
         });

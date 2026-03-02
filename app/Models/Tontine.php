@@ -29,6 +29,7 @@ class Tontine extends Model
         'requires_member_registration',
         'status',
         'moderation_reason',
+        'is_random_payout',
     ];
 
     protected $casts = [
@@ -37,6 +38,7 @@ class Tontine extends Model
         'creator_percentage' => 'decimal:2',
         'notification_settings' => 'array',
         'late_fee_amount' => 'decimal:2',
+        'is_random_payout' => 'boolean',
     ];
 
     public function user(): BelongsTo
