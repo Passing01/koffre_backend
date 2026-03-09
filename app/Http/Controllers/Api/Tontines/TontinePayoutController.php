@@ -30,4 +30,16 @@ class TontinePayoutController extends Controller
             'message' => 'Transfert approuvé. Les membres impayés ont été bloqués.',
         ]);
     }
+
+    /**
+     * Relancer manuellement le paiement d'un cycle (par un admin).
+     */
+    public function retryPayout(Request $request, int $id, int $cycle): JsonResponse
+    {
+        $this->tontineService->processPayoutByAdmin($id, $cycle, $request->user());
+
+        return response()->json([
+            'message' => 'Le virement a été relancé avec succès.',
+        ]);
+    }
 }

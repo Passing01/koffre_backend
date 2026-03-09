@@ -603,6 +603,7 @@ class TontineService
         $alreadyPaid = $tontine->payouts()
             ->where('tontine_member_id', $beneficiary->id)
             ->where('cycle_number', $cycle)
+            ->where('status', 'success') // On vérifie si un paiement RÉUSSI existe
             ->exists();
 
         if ($alreadyPaid) {
@@ -654,15 +655,25 @@ class TontineService
     private function executePayout(Tontine $tontine, TontineMember $beneficiary, int $cycle, float $beneficiaryAmount, float $creatorAmount, float $platformAmount, float $totalAmount): void
     {
         DB::transaction(function () use ($tontine, $beneficiary, $cycle, $beneficiaryAmount, $creatorAmount, $platformAmount, $totalAmount) {
-            $payout = \App\Models\TontinePayout::query()->create([
-                'tontine_id' => $tontine->id,
-                'tontine_member_id' => $beneficiary->id,
-                'cycle_number' => $cycle,
-                'amount' => $beneficiaryAmount,
-                'creator_amount' => $creatorAmount,
-                'platform_amount' => $platformAmount,
-                'status' => 'pending',
-            ]);
+            // Utiliser updateOrCreate pour éviter de créer plusieurs entrées Payout pour le même cycle si on ré-essaie
+            $payout = \App\Models\TontinePayout::query()->updateOrCreate(
+                [
+                    'tontine_id' => $tontine->id,
+                    'cycle_number' => $cycle,
+                ],
+                [
+                    'tontine_member_id' => $beneficiary->id,
+                    'amount' => $beneficiaryAmount,
+                    'creator_amount' => $creatorAmount,
+                    'platform_amount' => $platformAmount,
+                    'status' => 'pending',
+                ]
+            );
+
+            // Si déjà payé (même si on est arrivé ici par erreur), on s'arrête
+            if ($payout->status === 'success') {
+                return;
+            }
 
             $ref = 'TON-PAY-' . $tontine->id . '-' . $cycle;
             $beneficiaryAccount = $beneficiary->user?->phone ?? $beneficiary->phone;
@@ -764,8 +775,10 @@ class TontineService
 
         $beneficiary = $tontine->members()->where('payout_rank', $cycle)->where('status', 'accepted')->firstOrFail();
 
-        if ($tontine->payouts()->where('tontine_member_id', $beneficiary->id)->where('cycle_number', $cycle)->exists()) {
-            throw ValidationException::withMessages(['cycle' => ['Ce cycle a déjà été reversé.']]);
+        // On vérifie s'il y a déjà un payout SUCCESSFULLY effectué
+        $existingPayout = $tontine->payouts()->where('cycle_number', $cycle)->first();
+        if ($existingPayout && $existingPayout->status === 'success') {
+            throw ValidationException::withMessages(['cycle' => ['Ce cycle a déjà été reversé avec succès.']]);
         }
 
         $totalAmount = (float) $tontine->payments()->where('cycle_number', $cycle)->where('status', 'success')->sum('amount');

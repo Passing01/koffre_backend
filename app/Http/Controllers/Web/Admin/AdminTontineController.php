@@ -86,7 +86,10 @@ class AdminTontineController extends Controller
         for ($c = 1; $c <= $maxCycle; $c++) {
             $paidCount = $tontine->payments()->where('cycle_number', $c)->where('status', 'success')->count();
             $beneficiary = $tontine->members()->where('payout_rank', $c)->where('status', 'accepted')->first();
-            $alreadyPaid = $beneficiary && $tontine->payouts()->where('tontine_member_id', $beneficiary->id)->where('cycle_number', $c)->exists();
+            $alreadyPaid = $beneficiary && $tontine->payouts()
+                ->where('cycle_number', $c)
+                ->where('status', 'success')
+                ->exists();
             if ($paidCount >= $expectedCount && $beneficiary && !$alreadyPaid) {
                 $cyclesReadyForPayout[] = ['cycle' => $c, 'beneficiary' => $beneficiary->display_name];
             }

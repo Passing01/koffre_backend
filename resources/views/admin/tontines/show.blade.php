@@ -389,7 +389,8 @@
                                         <th class="text-center px-4 py-3 font-semibold text-gray-600">Cycle</th>
                                         <th class="text-right px-4 py-3 font-semibold text-gray-600">Montant net</th>
                                         <th class="text-center px-4 py-3 font-semibold text-gray-600">Statut</th>
-                                        <th class="text-center px-4 py-3 font-semibold text-gray-600 rounded-r-lg">Date</th>
+                                        <th class="text-center px-4 py-3 font-semibold text-gray-600">Date</th>
+                                        <th class="text-right px-4 py-3 font-semibold text-gray-600 rounded-r-lg">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-50">
@@ -418,6 +419,20 @@
                                             </td>
                                             <td class="px-4 py-3 text-center text-xs text-gray-500">
                                                 {{ $payout->created_at->format('d/m/Y H:i') }}
+                                            </td>
+                                            <td class="px-4 py-3 text-right">
+                                                @if($payout->status !== 'success')
+                                                    <form method="POST" action="{{ route('admin.tontines.process-payout', [$tontine->id, $payout->cycle_number]) }}" class="inline">
+                                                        @csrf
+                                                        <button type="submit" 
+                                                            class="px-3 py-1 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition"
+                                                            onclick="return confirm('Relancer ce virement ?');">
+                                                            <i class="fas fa-rotate mr-1"></i> Relancer
+                                                        </button>
+                                                    </form>
+                                                @else
+                                                    <span class="text-green-500 text-sm"><i class="fas fa-check-circle"></i> Payé</span>
+                                                @endif
                                             </td>
                                         </tr>
                                     @endforeach
