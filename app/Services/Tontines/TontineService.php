@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Carbon;
 
 class TontineService
 {
@@ -53,6 +54,10 @@ class TontineService
 
             $membersData = $data['members'] ?? [];
             unset($data['members']);
+
+            if (isset($data['starts_at'])) {
+                $data['starts_at'] = Carbon::parse($data['starts_at'])->startOfDay();
+            }
 
             if (isset($data['identity_document'])) {
                 $data['identity_document_path'] = $data['identity_document']->store('tontines/documents', 'public');

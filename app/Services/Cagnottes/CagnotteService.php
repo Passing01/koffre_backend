@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Carbon;
 
 use App\Models\Transaction;
 use App\Services\Payments\PaymentServiceInterface;
@@ -56,6 +57,11 @@ class CagnotteService
 
             $participants = $data['participants'] ?? [];
             unset($data['participants']);
+
+            // Force ends_at to end of day if it's a date string
+            if (isset($data['ends_at'])) {
+                $data['ends_at'] = Carbon::parse($data['ends_at'])->endOfDay();
+            }
 
             // Handle file uploads
             if (isset($data['profile_photo'])) {
@@ -416,7 +422,7 @@ class CagnotteService
         });
     }
 
-    public function processPayout(int $cagnotteId, User $adminUser): Cagnotte
+    public function processPayout(int $cagnotteId, ?User $adminUser = null): Cagnotte
     {
         $cagnotte = Cagnotte::query()->with('user')->findOrFail($cagnotteId);
 
@@ -424,12 +430,19 @@ class CagnotteService
             throw ValidationException::withMessages(['payout' => ['Le versement a déjà été effectué.']]);
         }
 
+        // Pour les cagnottes en mode direct, le versement se fait déjà à chaque contribution.
         if ($cagnotte->payout_mode !== 'escrow') {
-            throw ValidationException::withMessages(['payout' => ['Seules les cagnottes en mode coffre nécessitent un versement manuel de l\'admin.']]);
+            throw ValidationException::withMessages(['payout' => ['Seules les cagnottes en mode coffre (escrow) nécessitent un versement global.']]);
         }
 
-        if ($cagnotte->unlock_status !== 'approved') {
-            throw ValidationException::withMessages(['payout' => ['La demande de déblocage doit être approuvée avant le versement.']]);
+        // Si c'est un admin qui le fait manuellement, on vérifie le statut de déblocage
+        if ($adminUser !== null && $cagnotte->unlock_status !== 'approved') {
+            throw ValidationException::withMessages(['payout' => ['La demande de déblocage doit être approuvée par un admin avant le versement manuel.']]);
+        }
+
+        // Si c'est automatique (adminUser est null), on vérifie que la cagnotte est bien fermée (date atteinte)
+        if ($adminUser === null && $cagnotte->status !== 'closed' && ($cagnotte->ends_at && $cagnotte->ends_at->isFuture())) {
+            throw new \Exception("Le versement automatique ne peut être fait qu'après la clôture de la cagnotte.");
         }
 
         if ($cagnotte->current_amount <= 0) {
@@ -437,15 +450,12 @@ class CagnotteService
         }
 
         return DB::transaction(function () use ($cagnotte, $adminUser) {
-            // Use the primary payout account if available, otherwise fallback to user's phone
             $payoutAccount = $cagnotte->payout_account ?? $cagnotte->user->phone;
 
-            // Calculate net amount (deduct commission)
-            $commissionRate = config('services.platform.commission_rate', 0.01);
-            $commission = $cagnotte->current_amount * $commissionRate;
-            $netAmount = $cagnotte->current_amount - $commission;
+            $commissionRate = (float) config('services.platform.commission_rate', 0.01);
+            $commission = (float) $cagnotte->current_amount * $commissionRate;
+            $netAmount = (float) $cagnotte->current_amount - $commission;
 
-            // Call the payment service payout
             $success = $this->paymentService->payout(
                 account: $payoutAccount,
                 amount: (float) $netAmount,
@@ -454,37 +464,36 @@ class CagnotteService
             );
 
             if (!$success) {
+                Log::error("Payout failed for cagnotte #{$cagnotte->id}");
                 throw new \Exception("Échec lors de l'appel à l'API de paiement pour le versement.");
             }
 
-            // Mark as processed
-            $cagnotte->update(['payout_processed_at' => now()]);
+            $cagnotte->update(['payout_processed_at' => now(), 'status' => 'disbursed']);
 
-            // Create Transaction entry (debit from the cagnotte)
             Transaction::query()->create([
                 'cagnotte_id' => $cagnotte->id,
                 'type' => 'debit',
                 'amount' => $cagnotte->current_amount,
-                'balance_after' => 0, // Since we sent everything
+                'balance_after' => 0,
                 'reference' => 'PAYOUT-' . $cagnotte->id . '-' . time(),
             ]);
 
             $this->auditService->log(
-                action: 'cagnotte.payout_processed',
-                actorUserId: $adminUser->id,
+                action: $adminUser ? 'cagnotte.payout_processed' : 'cagnotte.payout_auto_processed',
+                actorUserId: $adminUser?->id,
                 auditableType: 'cagnotte',
                 auditableId: $cagnotte->id,
                 metadata: [
                     'amount' => $cagnotte->current_amount,
                     'payout_account' => $payoutAccount,
+                    'is_automatic' => $adminUser === null
                 ],
             );
 
-            // Notify user
             $this->fcmService->sendToUser(
                 $cagnotte->user,
                 "Fonds transférés !",
-                "Le versement de {$cagnotte->current_amount} XOF pour votre cagnotte '{$cagnotte->title}' a été effectué sur votre compte."
+                "Le versement automatique de {$cagnotte->current_amount} XOF pour votre cagnotte '{$cagnotte->title}' a été effectué."
             );
 
             return $cagnotte;

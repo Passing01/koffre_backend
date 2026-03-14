@@ -2,6 +2,7 @@
 
 use App\Models\Cagnotte;
 use App\Models\AuditLog;
+use App\Services\Cagnottes\CagnotteService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -54,8 +55,31 @@ Artisan::command('cagnottes:close-expired', function () {
         });
 })->purpose('Close expired cagnottes (active -> closed)');
 
+Artisan::command('cagnottes:process-payouts', function (CagnotteService $cagnotteService) {
+    Cagnotte::query()
+        ->where('status', 'closed')
+        ->where('payout_mode', 'escrow')
+        ->whereNull('payout_processed_at')
+        ->where('current_amount', '>', 0)
+        ->orderBy('id')
+        ->chunkById(50, function ($cagnottes) use ($cagnotteService) {
+            foreach ($cagnottes as $cagnotte) {
+                try {
+                    $cagnotteService->processPayout($cagnotte->id, null);
+                    $this->info("Payout processed for Cagnotte #{$cagnotte->id}");
+                } catch (\Exception $e) {
+                    $this->error("Error processing payout for Cagnotte #{$cagnotte->id}: " . $e->getMessage());
+                }
+            }
+        });
+})->purpose('Process automatic payouts for closed cagnottes');
+
 Schedule::command('cagnottes:close-expired')
     ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('cagnottes:process-payouts')
+    ->everyFiveMinutes()
     ->withoutOverlapping();
 
 Schedule::command('app:cagnotte-deadline-alert')

@@ -22,7 +22,7 @@ class StoreTontineRequest extends FormRequest
             'amount_per_installment' => 'required|numeric|min:0',
             'frequency' => 'required|in:days,weeks,months',
             'frequency_number' => 'required|integer|min:1',
-            'starts_at' => 'required|date|after:now',
+            'starts_at' => 'required|date|after_or_equal:today',
             'payout_mode' => 'required|in:direct,automatic',
             'creator_percentage' => 'nullable|numeric|min:0|max:100',
             'identity_document' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',

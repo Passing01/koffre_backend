@@ -25,7 +25,7 @@ class StorePublicCoffreRequest extends FormRequest
             'payout_accounts.*.method' => ['required_with:payout_accounts', 'string'],
             'payout_accounts.*.account' => ['required_with:payout_accounts', 'string'],
 
-            'ends_at' => ['required', 'date', 'after:now'],
+            'ends_at' => ['required', 'date', 'after_or_equal:today'],
 
             // KYC (Support both for Public)
             'creator_type' => ['required', 'in:physique,morale'],
