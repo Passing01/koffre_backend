@@ -66,4 +66,21 @@ class ContributionController extends Controller
             'data' => $items,
         ]);
     }
+
+    /**
+     * Relancer un paiement en attente (l'utilisateur veut un nouveau lien de paiement).
+     */
+    public function retry(Request $request, string $reference): JsonResponse
+    {
+        $actor = $request->user();
+
+        $result = $this->contributionService->retry($reference, $actor);
+
+        return response()->json([
+            'message'       => 'Nouveau lien de paiement généré.',
+            'contribution'  => $result['contribution'],
+            'payment_url'   => $result['payment_url'],
+            'payment_token' => $result['payment_token'],
+        ]);
+    }
 }

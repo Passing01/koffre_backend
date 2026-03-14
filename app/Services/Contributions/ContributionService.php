@@ -188,4 +188,60 @@ class ContributionService
             return true;
         });
     }
+
+    /**
+     * Relancer un paiement en attente pour un utilisateur.
+     * Génère un nouveau lien de paiement sans créer une nouvelle contribution.
+     */
+    public function retry(string $reference, ?User $actor): array
+    {
+        $contribution = Contribution::where('payment_reference', $reference)
+            ->where('payment_status', 'pending')
+            ->first();
+
+        if (!$contribution) {
+            throw ValidationException::withMessages([
+                'reference' => ['Aucun paiement en attente trouvé pour cette référence. Il a peut-être déjà été traité.'],
+            ]);
+        }
+
+        // Vérifier que l'utilisateur connecté est bien le propriétaire
+        if ($actor && $contribution->user_id && (int) $contribution->user_id !== (int) $actor->id) {
+            throw ValidationException::withMessages([
+                'reference' => ['Vous ne pouvez pas relancer un paiement qui ne vous appartient pas.'],
+            ]);
+        }
+
+        $cagnotte = $contribution->cagnotte;
+        if (!$cagnotte || $cagnotte->status !== 'active') {
+            throw ValidationException::withMessages([
+                'cagnotte_id' => ['La cagnotte associée n\'est plus active.'],
+            ]);
+        }
+
+        // Générer un nouveau lien de paiement avec la même référence
+        $paymentData = $this->paymentService->initiatePayment(
+            transactionId: $contribution->payment_reference,
+            amount: (float) $contribution->amount,
+            currency: 'XOF',
+            description: "Contribution à la cagnotte: {$cagnotte->title}",
+            customer: [
+                'name'  => $actor?->fullname ?? $contribution->contributor_name ?? 'Invité',
+                'email' => $actor?->email ?? 'guest@kofre.com',
+                'phone' => $actor?->phone ?? '',
+            ]
+        );
+
+        Log::info('Contribution payment retried', [
+            'reference'   => $contribution->payment_reference,
+            'user_id'     => $actor?->id,
+            'cagnotte_id' => $cagnotte->id,
+        ]);
+
+        return [
+            'contribution'  => $contribution,
+            'payment_url'   => $paymentData['payment_url'],
+            'payment_token' => $paymentData['payment_token'],
+        ];
+    }
 }

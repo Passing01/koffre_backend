@@ -38,11 +38,12 @@ class PaymentCallbackController extends Controller
      */
     public function handle(Request $request): JsonResponse
     {
-        $event = $request->input('event');
+        $event     = $request->input('event');
         $reference = $request->input('reference');
-        $status = $request->input('status');
-        $provider = $request->input('provider', 'unknown');
-        $redirect = $request->input('redirect');
+        $status    = $request->input('status');
+        $token     = $request->input('token');
+        $provider  = $request->input('provider', 'unknown');
+        $redirect  = $request->input('redirect');
 
         // Si référence absente, extraire depuis le payload GeniusPay (data.metadata)
         $data = $request->input('data', []);
@@ -55,12 +56,22 @@ class PaymentCallbackController extends Controller
         }
         $geniuspayRef = is_array($data) ? ($data['reference'] ?? null) : null;
 
+        // Référence alternative (token CinetPay, etc.)
+        if (!$reference) {
+            $reference = $token;
+        }
+
+        // Inférer l'événement si absent (GeniusPay redirige sans paramètre event)
+        if (!$event) {
+            $event = $this->inferEventFromParams($status, $token, $reference);
+        }
+
         Log::info('Payment Callback Received', [
-            'event' => $event,
+            'event'     => $event,
             'reference' => $reference,
-            'status' => $status,
-            'provider' => $provider,
-            'all' => $request->all(),
+            'status'    => $status,
+            'provider'  => $provider,
+            'all'       => $request->all(),
         ]);
 
         if (!$event || !in_array($event, self::ALLOWED_EVENTS)) {
@@ -182,5 +193,27 @@ class PaymentCallbackController extends Controller
     {
         Log::info('Cashout Completed', ['reference' => $reference]);
         return ['message' => 'Cashout complété avec succès.'];
+    }
+
+    /**
+     * Inférer l'événement depuis les paramètres legacy (status, token).
+     * Utilisé quand GeniusPay redirige sans paramètre 'event'.
+     */
+    private function inferEventFromParams(?string $status, ?string $token, ?string $reference): string
+    {
+        if ($status) {
+            return match (strtolower($status)) {
+                'success', 'completed', 'paid'    => 'payment.success',
+                'failed', 'error'                 => 'payment.failed',
+                'cancelled', 'canceled'           => 'payment.cancelled',
+                'expired'                         => 'payment.expired',
+                default                           => 'payment.initiated',
+            };
+        }
+        // Si on a un token ou une référence, on suppose que c'est un succès (GeniusPay redirect)
+        if ($token || $reference) {
+            return 'payment.success';
+        }
+        return 'payment.initiated';
     }
 }

@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->prefix('tontines')->group(function () {
     Route::put('/{id}/ranks', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'setRanks'])->where('id', '[0-9]+');
     Route::put('/{id}/members/{phone}/permissions', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'updateMemberPermissions'])->where('id', '[0-9]+');
     Route::post('/{id}/pay', [\App\Http\Controllers\Api\Tontines\TontinePaymentController::class, 'pay'])->where('id', '[0-9]+');
+    Route::post('/{id}/payments/{reference}/retry', [\App\Http\Controllers\Api\Tontines\TontinePaymentController::class, 'retry'])->where('id', '[0-9]+');
     Route::post('/{id}/payout-requests/{cycle}/approve', [\App\Http\Controllers\Api\Tontines\TontinePayoutController::class, 'approve'])->where('id', '[0-9]+')->where('cycle', '[0-9]+');
     Route::post('/{id}/payouts/{cycle}/retry', [\App\Http\Controllers\Api\Tontines\TontinePayoutController::class, 'retryPayout'])->where('id', '[0-9]+')->where('cycle', '[0-9]+');
     Route::post('/{id}/close', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'close'])->where('id', '[0-9]+');
@@ -65,6 +66,7 @@ Route::middleware('auth:sanctum')->get('/my-tontines', [\App\Http\Controllers\Ap
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/contribute/simulate', [ContributionController::class, 'simulate']);
     Route::post('/contribute/initiate', [ContributionController::class, 'initiate']);
+    Route::post('/contribute/retry/{reference}', [ContributionController::class, 'retry']);
     Route::get('/my-contributions', [ContributionController::class, 'listMine']);
 
     // Profile routes

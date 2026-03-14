@@ -157,37 +157,56 @@ class GeniusPayService implements PaymentServiceInterface
     {
         if ($this->isSimulation) {
             Log::info('GeniusPay payout SIMULATED', [
-                'account' => $account,
-                'amount' => $amount,
+                'account'     => $account,
+                'amount'      => $amount,
                 'description' => $description,
-                'method' => $method
+                'method'      => $method
             ]);
             return true;
         }
 
+        // Vérification wallet_id
+        if (empty($this->walletId)) {
+            Log::error('GeniusPay Payout Error: GENIUSPAY_WALLET_ID non configuré dans .env', [
+                'account' => $account,
+                'amount'  => $amount,
+            ]);
+            throw new \Exception('La configuration GENIUSPAY_WALLET_ID est manquante. Veuillez la définir dans le fichier .env.');
+        }
+
         $provider = $this->guessProvider($account, $method);
 
+        $payload = [
+            'wallet_id'      => $this->walletId,
+            'amount'         => (int) $amount,
+            'currency'       => 'XOF',
+            'description'    => $description,
+            'destination'    => [
+                'type'     => 'mobile_money',
+                'provider' => $provider,
+                'account'  => $account,
+            ],
+            'recipient'      => [
+                'name'  => 'Kofre User',
+                'phone' => $account,
+            ],
+            'idempotency_key' => 'payout_' . md5($account . $amount . $description),
+        ];
+
+        Log::info('GeniusPay Payout Request', [
+            'account'   => $account,
+            'provider'  => $provider,
+            'amount'    => $amount,
+            'wallet_id' => $this->walletId,
+            'payload'   => $payload,
+        ]);
+
         $response = Http::withHeaders([
-            'X-API-Key' => $this->publicKey,
+            'X-API-Key'    => $this->publicKey,
             'X-API-Secret' => $this->secretKey,
-            'Accept' => 'application/json',
+            'Accept'       => 'application/json',
             'Content-Type' => 'application/json',
-        ])->post("{$this->baseUrl}/payouts", [
-                    'wallet_id' => $this->walletId,
-                    'amount' => (int) $amount,
-                    'currency' => 'XOF',
-                    'description' => $description,
-                    'destination' => [
-                        'type' => 'mobile_money',
-                        'provider' => $provider,
-                        'account' => $account,
-                    ],
-                    'recipient' => [
-                        'name' => 'Kofre User',
-                        'phone' => $account,
-                    ],
-                    'idempotency_key' => 'payout_' . md5($account . $amount . $description . time()),
-                ]);
+        ])->post("{$this->baseUrl}/payouts", $payload);
 
         if ($response->failed()) {
             Log::error('GeniusPay Payout Failed', [

@@ -773,20 +773,56 @@ class TontineService
             throw ValidationException::withMessages(['tontine_id' => ['Non autorisé.']]);
         }
 
-        $beneficiary = $tontine->members()->where('payout_rank', $cycle)->where('status', 'accepted')->firstOrFail();
+        // Trouver le bénéficiaire selon la même logique que checkAndProcessPayout
+        $expectedCount = $tontine->members()->where('status', 'accepted')->count();
+        if ($expectedCount === 0) {
+            throw ValidationException::withMessages(['cycle' => ['Aucun membre actif dans cette tontine.']]);
+        }
 
-        // On vérifie s'il y a déjà un payout SUCCESSFULLY effectué
+        $rankToFind = $cycle % $expectedCount;
+        if ($rankToFind === 0) $rankToFind = $expectedCount;
+
+        $beneficiary = $tontine->members()
+            ->where('payout_rank', $rankToFind)
+            ->whereIn('status', ['accepted', 'blocked']) // on permet même pour les bloqués (c'est l'admin qui décide)
+            ->first();
+
+        if (!$beneficiary) {
+            // Fallback : chercher par rang égal au cycle (ancien comportement)
+            $beneficiary = $tontine->members()
+                ->where('payout_rank', $cycle)
+                ->whereIn('status', ['accepted', 'blocked'])
+                ->first();
+        }
+
+        if (!$beneficiary) {
+            throw ValidationException::withMessages([
+                'cycle' => ["Aucun bénéficiaire trouvé pour le cycle #{$cycle} (rang attendu : #{$rankToFind})."]
+            ]);
+        }
+
+        // Vérifier si un payout RÉUSSI existe déjà
         $existingPayout = $tontine->payouts()->where('cycle_number', $cycle)->first();
         if ($existingPayout && $existingPayout->status === 'success') {
             throw ValidationException::withMessages(['cycle' => ['Ce cycle a déjà été reversé avec succès.']]);
         }
 
-        $totalAmount = (float) $tontine->payments()->where('cycle_number', $cycle)->where('status', 'success')->sum('amount');
-        $creatorPct = (float) ($tontine->creator_percentage ?? 0);
-        $platformPct = (float) config('services.platform.tontine_payout_commission_rate', 0.01);
-        $creatorAmount = round($totalAmount * ($creatorPct / 100), 2);
-        $platformAmount = round($totalAmount * $platformPct, 2);
+        $totalAmount     = (float) $tontine->payments()->where('cycle_number', $cycle)->where('status', 'success')->sum('amount');
+        $creatorPct      = (float) ($tontine->creator_percentage ?? 0);
+        $platformPct     = (float) config('services.platform.tontine_payout_commission_rate', 0.01);
+        $creatorAmount   = round($totalAmount * ($creatorPct / 100), 2);
+        $platformAmount  = round($totalAmount * $platformPct, 2);
         $beneficiaryAmount = $totalAmount - $creatorAmount - $platformAmount;
+
+        Log::info('Admin Retry Payout', [
+            'admin'        => $adminUser->id,
+            'tontine'      => $tontineId,
+            'cycle'        => $cycle,
+            'beneficiary'  => $beneficiary->phone,
+            'rank_found'   => $rankToFind,
+            'total_amount' => $totalAmount,
+            'net_amount'   => $beneficiaryAmount,
+        ]);
 
         $this->executePayout($tontine, $beneficiary, $cycle, $beneficiaryAmount, $creatorAmount, $platformAmount, $totalAmount);
     }
