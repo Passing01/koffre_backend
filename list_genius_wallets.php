@@ -51,21 +51,28 @@ foreach ($endpoints as $endpoint) {
             echo "SUCCÈS !\n";
             $found = true;
             
-            // Affichage propre des résultats
-            if (isset($data['data']) && is_array($data['data'])) {
+            echo "--- RÉPONSE BRUTE (RAW JSON) ---\n";
+            echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            echo "\n--------------------------------\n";
+
+            // Selon la doc : { "success": true, "data": { "wallets": [ ... ] } }
+            $wallets = $data['data']['wallets'] ?? $data['data'] ?? [];
+
+            if (!empty($wallets) && is_array($wallets)) {
                 echo "Wallets trouvés :\n";
-                echo "------------------------------------------------------------\n";
-                echo sprintf("%-20s | %-10s | %-36s\n", "NOM", "TYPE", "ID API (À METTRE DANS .ENV)");
-                echo "------------------------------------------------------------\n";
-                foreach ($data['data'] as $wallet) {
+                echo "----------------------------------------------------------------------\n";
+                echo sprintf("%-20s | %-10s | %-36s\n", "NOM", "TYPE", "ID API (UUID)");
+                echo "----------------------------------------------------------------------\n";
+                foreach ($wallets as $wallet) {
+                    if (!is_array($wallet)) continue;
                     $name = $wallet['name'] ?? $wallet['title'] ?? 'Sans nom';
                     $type = $wallet['type'] ?? 'N/A';
                     $id = $wallet['id'] ?? $wallet['uuid'] ?? $wallet['token'] ?? 'N/A';
                     echo sprintf("%-20s | %-10s | %-36s\n", $name, $type, $id);
                 }
-                echo "------------------------------------------------------------\n";
+                echo "----------------------------------------------------------------------\n";
             } else {
-                echo "Réponse reçue mais format inattendu :\n";
+                echo "Aucun wallet trouvé dans la réponse data.\n";
                 print_r($data);
             }
         } else {
