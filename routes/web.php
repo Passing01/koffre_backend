@@ -40,7 +40,7 @@ Route::prefix('admin')->group(function () {
     Route::post('/logout', [\App\Http\Controllers\Web\Admin\AdminAuthController::class, 'logout'])->name('admin.logout');
 });
 
-Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
+Route::prefix('admin')->middleware(['auth', 'admin', 'check.blocked'])->group(function () {
     Route::get('/', [\App\Http\Controllers\Web\Admin\AdminDashboardController::class, 'index'])->name('admin.dashboard');
     Route::get('/cagnottes', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'index'])->name('admin.cagnottes.index');
     Route::get('/cagnottes/{id}', [\App\Http\Controllers\Web\Admin\AdminCagnotteController::class, 'show'])->name('admin.cagnottes.show');
@@ -66,6 +66,12 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     // Audit Logs
     Route::get('/audit', [\App\Http\Controllers\Web\Admin\AdminAuditLogController::class, 'index'])->name('admin.audit.index');
     Route::get('/audit/{id}', [\App\Http\Controllers\Web\Admin\AdminAuditLogController::class, 'show'])->name('admin.audit.show');
+
+    // Users
+    Route::get('/users', [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'index'])->name('admin.users.index');
+    Route::get('/users/{id}', [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'show'])->name('admin.users.show');
+    Route::post('/users/{id}/block', [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'block'])->name('admin.users.block');
+    Route::post('/users/{id}/unblock', [\App\Http\Controllers\Web\Admin\AdminUserController::class, 'unblock'])->name('admin.users.unblock');
 });
 
 

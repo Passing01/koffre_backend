@@ -94,6 +94,12 @@
                     <i class="fas fa-history w-5"></i>
                     <span>Logs d'audit</span>
                 </a>
+
+                <a href="{{ route('admin.users.index') }}"
+                    class="sidebar-link flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+                    <i class="fas fa-users w-5"></i>
+                    <span>Utilisateurs</span>
+                </a>
             </nav>
 
             <div class="absolute bottom-0 w-64 p-4 border-t border-gray-700">

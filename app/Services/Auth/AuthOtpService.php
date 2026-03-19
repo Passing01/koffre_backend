@@ -157,6 +157,7 @@ class AuthOtpService
             $user->is_verified = true;
             $user->otp_code = null;
             $user->otp_expires_at = null;
+            $user->last_login_at = now();
             $user->save();
 
             $result = ['user' => $user->fresh()];

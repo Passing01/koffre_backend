@@ -38,6 +38,10 @@ class StorePrivateCagnotteRequest extends FormRequest
 
             // NEW FIELDS
             'accepted_policy' => ['required', 'accepted'],
+
+            'show_creator_name' => ['nullable', 'boolean'],
+            'show_creator_phone' => ['nullable', 'boolean'],
+            'show_contributors' => ['nullable', 'boolean'],
         ];
     }
 }

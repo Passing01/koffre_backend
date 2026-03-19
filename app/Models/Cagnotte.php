@@ -48,6 +48,9 @@ class Cagnotte extends Model
         'blocked_at',
         'is_private_coffre',
         'accepted_policy',
+        'show_creator_name',
+        'show_creator_phone',
+        'show_contributors',
     ];
 
     protected $casts = [
@@ -63,6 +66,9 @@ class Cagnotte extends Model
         'blocked_at' => 'datetime',
         'is_private_coffre' => 'boolean',
         'accepted_policy' => 'boolean',
+        'show_creator_name' => 'boolean',
+        'show_creator_phone' => 'boolean',
+        'show_contributors' => 'boolean',
     ];
 
 

@@ -28,6 +28,10 @@ class User extends Authenticatable
         'is_admin',
         'country_code',
         'fcm_token',
+        'accepted_terms_at',
+        'is_blocked',
+        'last_login_at',
+        'last_activity_at',
     ];
 
     /**
@@ -50,6 +54,10 @@ class User extends Authenticatable
             'otp_expires_at' => 'datetime',
             'is_verified' => 'boolean',
             'is_admin' => 'boolean',
+            'accepted_terms_at' => 'datetime',
+            'is_blocked' => 'boolean',
+            'last_login_at' => 'datetime',
+            'last_activity_at' => 'datetime',
         ];
     }
 

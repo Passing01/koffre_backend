@@ -41,6 +41,7 @@ return [
         'notify_url' => env('CINETPAY_NOTIFY_URL'),
         'return_url' => env('CINETPAY_RETURN_URL'),
         'wait_url' => env('CINETPAY_WAIT_URL'),
+        'country' => 'BF', // Burkina Faso par défaut
     ],
 
     'fedapay' => [
@@ -73,9 +74,12 @@ return [
         'mode' => env('GENIUSPAY_MODE', 'test'),
         'simulation' => env('GENIUSPAY_SIMULATION', false),
         'webhook_secret' => env('GENIUSPAY_WEBHOOK_SECRET', ''),
+        'gateway' => env('GENIUSPAY_DEFAULT_GATEWAY', 'cinetpay'),
+        'centralization' => env('GENIUSPAY_CENTRALIZATION', 70),
+        'country' => env('GENIUSPAY_COUNTRY', 'BF'),
     ],
 
-    'default_gateway' => env('PAYMENT_GATEWAY', 'geniuspay') ?: 'geniuspay',
+    'default_gateway' => env('PAYMENT_GATEWAY', 'cinetpay') ?: 'cinetpay',
 
     'platform' => [
         'commission_rate' => env('PLATFORM_COMMISSION_RATE', 0.01), // 1% cagnottes

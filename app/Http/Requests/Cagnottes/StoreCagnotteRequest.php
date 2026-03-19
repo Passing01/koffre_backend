@@ -64,6 +64,10 @@ class StoreCagnotteRequest extends FormRequest
 
             // Image de fond de la cagnotte
             'background_image' => ['nullable', 'file', 'image', 'max:5120'],
+
+            'show_creator_name' => ['nullable', 'boolean'],
+            'show_creator_phone' => ['nullable', 'boolean'],
+            'show_contributors' => ['nullable', 'boolean'],
         ];
     }
 }

@@ -13,6 +13,8 @@ class GeniusPayService implements PaymentServiceInterface
     private string $baseUrl;
     private bool $isSimulation;
     private ?string $defaultMethod;
+    private ?int $centralization;
+    private ?string $country;
 
     public function __construct(?string $defaultMethod = null)
     {
@@ -21,7 +23,9 @@ class GeniusPayService implements PaymentServiceInterface
         $this->walletId = config('services.geniuspay.wallet_id') ?? '';
         $this->baseUrl = config('services.geniuspay.base_url', 'https://pay.genius.ci/api/v1/merchant');
         $this->isSimulation = config('services.geniuspay.simulation', false);
-        $this->defaultMethod = $defaultMethod;
+        $this->defaultMethod = $defaultMethod ?? config('services.geniuspay.gateway');
+        $this->centralization = (int) config('services.geniuspay.centralization', 70);
+        $this->country = config('services.geniuspay.country', 'BF');
     }
 
     /**
@@ -69,7 +73,15 @@ class GeniusPayService implements PaymentServiceInterface
             ],
         ];
         if ($this->defaultMethod !== null) {
-            $payload['payment_method'] = $this->defaultMethod;
+            $payload['gateway'] = $this->defaultMethod;
+        }
+
+        if ($this->centralization !== null) {
+            $payload['centralization_rate'] = $this->centralization; // ou 'centralization' selon l'API exacte
+        }
+
+        if ($this->country !== null) {
+            $payload['country'] = $this->country;
         }
 
         Log::info('GeniusPay Initiate Payment', [

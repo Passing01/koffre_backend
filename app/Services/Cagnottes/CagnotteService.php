@@ -93,7 +93,7 @@ class CagnotteService
                 unset($data['background_image']);
             }
 
-            $data['status'] = 'pending';
+            $data['status'] = 'active';
 
             $cagnotte = Cagnotte::query()->create($data);
 
@@ -218,6 +218,19 @@ class CagnotteService
     {
         $cagnotte = $this->getAccessibleOrFail($cagnotteId, $user);
 
+        $isOwner = (int) $cagnotte->user_id === (int) $user->id;
+        $isAdmin = $user->is_admin;
+
+        // Respecter les flags de visibilité pour le créateur (si pas owner/admin)
+        if (!$isOwner && !$isAdmin) {
+            if (!$cagnotte->show_creator_name) {
+                $cagnotte->user->fullname = 'Anonyme';
+            }
+            if (!$cagnotte->show_creator_phone) {
+                $cagnotte->user->phone = 'Masqué';
+            }
+        }
+
         if ($cagnotte->visibility === 'public') {
             $myContributions = $cagnotte->contributions()
                 ->where('payment_status', 'success')
@@ -225,13 +238,26 @@ class CagnotteService
                 ->orderByDesc('id')
                 ->get();
 
-            return [
+            $result = [
                 'cagnotte' => $cagnotte,
                 'my_contributions' => $myContributions,
                 'my_contributed_total' => $myContributions->sum('amount'),
             ];
+
+            // Liste globale des contributeurs pour le public si autorisé
+            if ($cagnotte->show_contributors || $isOwner || $isAdmin) {
+                $result['contributors'] = $cagnotte->contributions()
+                    ->where('payment_status', 'success')
+                    ->with(['user:id,fullname,phone'])
+                    ->orderByDesc('id')
+                    ->get();
+                $result['contributors_total'] = $result['contributors']->sum('amount');
+            }
+
+            return $result;
         }
 
+        // Pour les cagnottes privées, le comportement reste le même ou est ajusté
         $contributors = $cagnotte->contributions()
             ->where('payment_status', 'success')
             ->with(['user:id,fullname,phone'])
@@ -249,6 +275,12 @@ class CagnotteService
                 'status_label' => $hasContributed ? 'A contribué' : 'En attente',
             ];
         });
+
+        // Hider les contributeurs si flag à false (même privé?)
+        // Généralement pour privé on veut voir, mais ici on respecte le souhait global s'il y a lieu.
+        if (!$cagnotte->show_contributors && !$isOwner && !$isAdmin) {
+            $contributors = collect([]); // Masquer
+        }
 
         return [
             'cagnotte' => $cagnotte,

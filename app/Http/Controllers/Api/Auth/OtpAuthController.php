@@ -60,4 +60,24 @@ class OtpAuthController extends Controller
             'message' => 'Token FCM mis à jour.',
         ]);
     }
+
+    public function acceptTerms(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->accepted_terms_at) {
+            return response()->json([
+                'message' => 'Conditions déjà acceptées.',
+            ], 200);
+        }
+
+        $user->update([
+            'accepted_terms_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Conditions générales acceptées avec succès.',
+            'user' => $user->fresh(),
+        ]);
+    }
 }

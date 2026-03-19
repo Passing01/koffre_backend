@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('auth')->group(function () {
     Route::post('/send-otp', [OtpAuthController::class, 'sendOtp'])->middleware('throttle:otp-send');
     Route::post('/verify-otp', [OtpAuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
-    Route::post('/update-fcm-token', [OtpAuthController::class, 'updateFcmToken'])->middleware('auth:sanctum');
+    Route::post('/update-fcm-token', [OtpAuthController::class, 'updateFcmToken'])->middleware(['auth:sanctum', 'check.blocked']);
+    Route::post('/accept-terms', [OtpAuthController::class, 'acceptTerms'])->middleware(['auth:sanctum', 'check.blocked']);
 });
 
 Route::prefix('cagnottes')->group(function () {
@@ -19,7 +20,7 @@ Route::prefix('cagnottes')->group(function () {
     // Commentaires publics (lecture sans auth)
     Route::get('/{id}/comments', [CagnotteInteractionController::class, 'listComments']);
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'check.blocked'])->group(function () {
         Route::post('/', [CagnotteController::class, 'store']); // Fallback / Global
         Route::post('/public/direct', [CagnotteController::class, 'storePublicDirect']);
         Route::post('/public/coffre', [CagnotteController::class, 'storePublicCoffre']);
@@ -42,7 +43,7 @@ Route::prefix('cagnottes')->group(function () {
     });
 });
 
-Route::middleware('auth:sanctum')->prefix('tontines')->group(function () {
+Route::middleware(['auth:sanctum', 'check.blocked'])->prefix('tontines')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'index']);
     Route::get('/mine', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'index']);
     Route::get('/earnings', [\App\Http\Controllers\Api\Tontines\TontineEarningController::class, 'index']);
@@ -60,10 +61,10 @@ Route::middleware('auth:sanctum')->prefix('tontines')->group(function () {
     Route::post('/{id}/close', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'close'])->where('id', '[0-9]+');
 });
 
-Route::middleware('auth:sanctum')->get('/my-cagnottes', [CagnotteController::class, 'mine']);
-Route::middleware('auth:sanctum')->get('/my-tontines', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'index']);
+Route::middleware(['auth:sanctum', 'check.blocked'])->get('/my-cagnottes', [CagnotteController::class, 'mine']);
+Route::middleware(['auth:sanctum', 'check.blocked'])->get('/my-tontines', [\App\Http\Controllers\Api\Tontines\TontineController::class, 'index']);
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'check.blocked'])->group(function () {
     Route::post('/contribute/simulate', [ContributionController::class, 'simulate']);
     Route::post('/contribute/initiate', [ContributionController::class, 'initiate']);
     Route::post('/contribute/retry/{reference}', [ContributionController::class, 'retry']);
