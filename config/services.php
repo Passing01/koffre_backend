@@ -79,7 +79,7 @@ return [
         'country' => env('GENIUSPAY_COUNTRY', 'BF'),
     ],
 
-    'default_gateway' => env('PAYMENT_GATEWAY', 'cinetpay') ?: 'cinetpay',
+    'default_gateway' => env('PAYMENT_GATEWAY', 'paydunya') ?: 'paydunya',
 
     'platform' => [
         'commission_rate' => env('PLATFORM_COMMISSION_RATE', 0.01), // 1% cagnottes

@@ -58,8 +58,8 @@ class PayDunyaService implements PaymentServiceInterface
                         'transaction_id' => $transactionId,
                     ],
                     'actions' => [
-                        'cancel_url' => url('/payments/cancel'),
-                        'return_url' => url('/payments/success'),
+                        'cancel_url' => route('payment.callback', ['reference' => $transactionId, 'event' => 'payment.cancelled', 'provider' => 'paydunya']),
+                        'return_url' => route('payment.callback', ['reference' => $transactionId, 'event' => 'payment.success', 'provider' => 'paydunya']),
                     ]
                 ]);
 
@@ -117,11 +117,79 @@ class PayDunyaService implements PaymentServiceInterface
             return true;
         }
 
-        // Implementation of PayDunya Disburse API would go here
-        // For now, if not simulation and not fully configured, return false or throw
-        // This is a placeholder since we are mainly in simulation for now
+        $withdrawMode = $this->guessWithdrawMode($method ?? '');
+        $accountAlias = preg_replace('/[^\d]/', '', $account);
+        // PayDunya expects number without country prefix for alias
+        if (str_starts_with($accountAlias, '226')) {
+            $accountAlias = substr($accountAlias, 3);
+        }
 
-        Log::warning('PayDunya payout called but not fully implemented for production.');
-        return false;
+        try {
+            // Step 1: Get Invoice
+            $response = Http::withHeaders([
+                'PAYDUNYA-MASTER-KEY' => $this->masterKey,
+                'PAYDUNYA-PRIVATE-KEY' => $this->privateKey,
+                'PAYDUNYA-TOKEN' => $this->token,
+            ])->post("https://app.paydunya.com/api/v2/disburse/get-invoice", [
+                'account_alias' => $accountAlias,
+                'amount' => (int) $amount,
+                'withdraw_mode' => $withdrawMode,
+                'callback_url' => route('payments.callback', ['provider' => 'paydunya', 'event' => 'payout.completed']),
+            ]);
+
+            if ($response->failed() || ($response->json()['response_code'] ?? '') !== '00') {
+                Log::error('PayDunya Disburse Get Invoice Failed', [
+                    'account' => $accountAlias,
+                    'mode' => $withdrawMode,
+                    'response' => $response->json(),
+                ]);
+                return false;
+            }
+
+            $disburseToken = $response->json()['disburse_token'];
+
+            // Step 2: Submit Invoice
+            $submitResponse = Http::withHeaders([
+                'PAYDUNYA-MASTER-KEY' => $this->masterKey,
+                'PAYDUNYA-PRIVATE-KEY' => $this->privateKey,
+                'PAYDUNYA-TOKEN' => $this->token,
+            ])->post("https://app.paydunya.com/api/v2/disburse/submit-invoice", [
+                'disburse_invoice' => $disburseToken,
+            ]);
+
+            if ($submitResponse->failed() || ($submitResponse->json()['response_code'] ?? '') !== '00') {
+                Log::error('PayDunya Disburse Submit Invoice Failed', [
+                    'token' => $disburseToken,
+                    'response' => $submitResponse->json(),
+                ]);
+                return false;
+            }
+
+            $result = $submitResponse->json();
+            Log::info('PayDunya Payout Success', ['result' => $result]);
+
+            return in_array($result['status'] ?? '', ['success', 'pending']) || ($result['response_code'] ?? '') === '00';
+        } catch (\Exception $e) {
+            Log::error('PayDunya Payout Exception', ['message' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    private function guessWithdrawMode(string $method): string
+    {
+        $method = strtolower($method);
+        if (str_contains($method, 'orange')) {
+            return 'orange-money-burkina';
+        }
+        if (str_contains($method, 'moov')) {
+            return 'moov-burkina-faso';
+        }
+        if (str_contains($method, 'wave')) {
+            // Wave might not be available for BF for now in PayDunya disburse doc, 
+            // but let's default to something if unknown
+            return 'orange-money-burkina'; 
+        }
+
+        return 'orange-money-burkina';
     }
 }
