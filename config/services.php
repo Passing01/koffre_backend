@@ -74,7 +74,7 @@ return [
         'mode' => env('GENIUSPAY_MODE', 'test'),
         'simulation' => env('GENIUSPAY_SIMULATION', false),
         'webhook_secret' => env('GENIUSPAY_WEBHOOK_SECRET', ''),
-        'gateway' => env('GENIUSPAY_DEFAULT_GATEWAY', 'cinetpay'),
+        'gateway' => env('GENIUSPAY_DEFAULT_GATEWAY'),
         'centralization' => env('GENIUSPAY_CENTRALIZATION', 70),
         'country' => env('GENIUSPAY_COUNTRY', 'BF'),
     ],

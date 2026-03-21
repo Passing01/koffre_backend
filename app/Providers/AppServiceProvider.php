@@ -20,7 +20,7 @@ class AppServiceProvider extends ServiceProvider
                 $gateway = config('services.default_gateway');
                 return match ($gateway) {
                     'fedapay' => new \App\Services\Payments\FedaPayService(),
-                    'cinetpay' => new \App\Services\Payments\GeniusPayService('cinetpay'),
+                    'cinetpay' => new \App\Services\Payments\GeniusPayService(),
                     'geniuspay' => new \App\Services\Payments\GeniusPayService(),
                     default => new \App\Services\Payments\GeniusPayService(),
                 };
