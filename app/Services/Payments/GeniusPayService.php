@@ -65,23 +65,24 @@ class GeniusPayService implements PaymentServiceInterface
             'customer' => [
                 'name' => $customer['name'] ?? 'Kofre User',
                 'email' => $customer['email'] ?? 'user@kofre.com',
-                'phone' => $customer['phone'] ?? '',
+                'phone' => $this->formatPhone($customer['phone'] ?? '', $this->country),
             ],
             'metadata' => [
                 'transaction_id' => $transactionId,  // Notre référence interne (KOF-... ou TON-...)
                 'order_id' => $transactionId,         // Alias pour compatibilité avec le payload webhook
             ],
         ];
+
+        if ($this->country !== null) {
+            $payload['customer']['country'] = $this->country;
+        }
+
         if ($this->defaultMethod !== null) {
             $payload['gateway'] = $this->defaultMethod;
         }
 
         if ($this->centralization !== null) {
             $payload['centralization_rate'] = $this->centralization; // ou 'centralization' selon l'API exacte
-        }
-
-        if ($this->country !== null) {
-            $payload['country'] = $this->country;
         }
 
         Log::info('GeniusPay Initiate Payment', [
@@ -125,6 +126,32 @@ class GeniusPayService implements PaymentServiceInterface
             'payment_id' => $data['reference'] ?? $transactionId,
             'payment_token' => $data['reference'] ?? $transactionId,
         ];
+    }
+
+    private function formatPhone(string $phone, ?string $country): string
+    {
+        if (empty($phone)) return '';
+        
+        // Remove all non-digits except +
+        $phone = preg_replace('/[^\d+]/', '', $phone);
+        
+        if (str_starts_with($phone, '+')) return $phone;
+        if (str_starts_with($phone, '00')) return '+' . substr($phone, 2);
+        
+        $prefixes = [
+            'BF' => '+226',
+            'CI' => '+225',
+            'SN' => '+221',
+            'BJ' => '+229',
+            'ML' => '+223',
+            'NE' => '+227',
+            'TG' => '+228',
+            'CM' => '+237',
+        ];
+
+        $prefix = $prefixes[strtoupper($country ?? 'BF')] ?? '+226';
+        
+        return $prefix . ltrim($phone, '0');
     }
 
     /**
@@ -186,7 +213,8 @@ class GeniusPayService implements PaymentServiceInterface
             throw new \Exception('La configuration GENIUSPAY_WALLET_ID est manquante. Veuillez la définir dans le fichier .env.');
         }
 
-        $provider = $this->guessProvider($account, $method);
+        $payoutAccount = $this->formatPhone($account, $this->country);
+        $provider = $this->guessProvider($payoutAccount, $method);
 
         $payload = [
             'wallet_id'      => $this->walletId,
@@ -196,17 +224,17 @@ class GeniusPayService implements PaymentServiceInterface
             'destination'    => [
                 'type'     => 'mobile_money',
                 'provider' => $provider,
-                'account'  => $account,
+                'account'  => $payoutAccount,
             ],
             'recipient'      => [
                 'name'  => 'Kofre User',
-                'phone' => $account,
+                'phone' => $payoutAccount,
             ],
             'idempotency_key' => 'payout_' . md5($account . $amount . $description),
         ];
 
         Log::info('GeniusPay Payout Request', [
-            'account'   => $account,
+            'account'   => $payoutAccount,
             'provider'  => $provider,
             'amount'    => $amount,
             'wallet_id' => $this->walletId,
@@ -222,7 +250,7 @@ class GeniusPayService implements PaymentServiceInterface
 
         if ($response->failed()) {
             Log::error('GeniusPay Payout Failed', [
-                'account' => $account,
+                'account' => $payoutAccount,
                 'provider' => $provider,
                 'status' => $response->status(),
                 'body' => $response->body(),
@@ -238,22 +266,34 @@ class GeniusPayService implements PaymentServiceInterface
 
     private function guessProvider(string $account, ?string $method = null): string
     {
+        $country = strtoupper($this->country ?? 'BF');
+        $suffixes = [
+            'BF' => 'bfa',
+            'CI' => 'civ',
+            'SN' => 'sen',
+            'BJ' => 'ben',
+            'ML' => 'mli',
+            'NE' => 'ner',
+            'TG' => 'tgo',
+        ];
+        $suffix = $suffixes[$country] ?? 'bfa';
+
         if ($method) {
             // Map common methods to GeniusPay providers
             $method = strtolower($method);
             if (str_contains($method, 'wave'))
-                return 'wave';
+                return 'wave_' . $suffix;
             if (str_contains($method, 'orange'))
-                return 'orange_money_ci';
+                return 'orange_money_' . $suffix;
             if (str_contains($method, 'mtn'))
-                return 'mtn_money_ci';
+                return 'mtn_money_' . $suffix;
             if (str_contains($method, 'moov'))
-                return 'moov_money_ci';
+                return 'moov_money_' . $suffix;
             if ($method === 'cinetpay')
                 return 'cinetpay';
         }
 
         // Default to wave if unknown
-        return 'wave';
+        return 'wave_' . $suffix;
     }
 }
