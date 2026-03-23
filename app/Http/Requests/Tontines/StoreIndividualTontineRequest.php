@@ -27,10 +27,14 @@ class StoreIndividualTontineRequest extends FormRequest
                 'date', 
                 'after:starts_at',
                 function ($attribute, $value, $fail) {
-                    $start = Carbon::parse($this->input('starts_at'))->startOfDay();
-                    $target = Carbon::parse($value)->endOfDay();
-                    if ($target->diffInDays($start) < 7) {
-                        $fail('La date de retrait doit être au moins une semaine après le début.');
+                    $startStr = $this->input('starts_at');
+                    if (!$startStr) return; // Si non renseigné, la règle 'required' s'en charge
+
+                    $start = Carbon::parse($startStr)->startOfDay();
+                    $target = Carbon::parse($value)->startOfDay();
+                    
+                    if ($start->copy()->addDays(7)->isAfter($target)) {
+                        $fail('La date de retrait doit être d\'au moins une semaine après le début.');
                     }
                 }
             ],
