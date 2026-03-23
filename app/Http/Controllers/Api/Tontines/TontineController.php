@@ -35,6 +35,26 @@ class TontineController extends Controller
         ], 201);
     }
 
+    public function storeIndividual(\App\Http\Requests\Tontines\StoreIndividualTontineRequest $request): JsonResponse
+    {
+        $tontine = $this->tontineService->createIndividual($request->user(), $request->validated());
+
+        return response()->json([
+            'message' => 'Tontine individuelle créée avec succès.',
+            'data' => $tontine,
+        ], 201);
+    }
+
+    public function withdrawIndividual($id, Request $request): JsonResponse
+    {
+        $payout = $this->tontineService->withdrawIndividual((int) $id, $request->user());
+
+        return response()->json([
+            'message' => 'Vos fonds ont été reversés avec succès.',
+            'data' => $payout,
+        ]);
+    }
+
     public function show($id, Request $request): JsonResponse
     {
         $details = $this->tontineService->getDetails((int) $id, $request->user());

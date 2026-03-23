@@ -43,9 +43,21 @@ class TontineReminderCommand extends Command
                         $fcmService->sendToUser(
                             $member->user,
                             "Rappel de paiement",
-                            "Votre paiement de {$tontine->amount_per_installment} {$tontine->currency} pour la tontine '{$tontine->title}' est dû dans {$daysUntil} jour(s)."
+                            "Votre épargne de {$tontine->amount_per_installment} {$tontine->currency} pour '{$tontine->title}' est attendue dans {$daysUntil} jour(s)."
                         );
                     }
+                }
+            }
+
+            // Notification de retrait pour les tontines individuelles
+            if ($tontine->type === 'individual' && $tontine->target_payout_date) {
+                // Notifier le jour même si la date est atteinte
+                if (now()->startOfDay()->equalTo($tontine->target_payout_date->startOfDay()) && $tontine->user) {
+                    $fcmService->sendToUser(
+                        $tontine->user,
+                        "C'est le jour J !",
+                        "Félicitations, votre tontine individuelle '{$tontine->title}' a atteint sa date de maturité. Vous pouvez retirer vos fonds dès maintenant !"
+                    );
                 }
             }
         }

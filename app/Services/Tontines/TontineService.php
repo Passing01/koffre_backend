@@ -143,6 +143,54 @@ class TontineService
         });
     }
 
+    public function createIndividual(User $user, array $data): Tontine
+    {
+        return DB::transaction(function () use ($user, $data) {
+            $data['user_id'] = $user->id;
+            $data['type'] = 'individual';
+            $data['is_random_payout'] = false;
+            $data['max_participants'] = 1;
+            $data['requires_member_registration'] = false;
+            $data['creator_percentage'] = 0; // Pas de commission sur soi-même
+
+            if (isset($data['starts_at'])) {
+                $data['starts_at'] = Carbon::parse($data['starts_at'])->startOfDay();
+            }
+
+            if (isset($data['target_payout_date'])) {
+                $data['target_payout_date'] = Carbon::parse($data['target_payout_date'])->endOfDay();
+            }
+
+            /** @var Tontine $tontine */
+            $tontine = Tontine::query()->create($data);
+
+            // Add the creator as the unique member
+            TontineMember::query()->create([
+                'tontine_id' => $tontine->id,
+                'phone' => $user->phone,
+                'user_id' => $user->id,
+                'status' => 'accepted',
+                'payout_rank' => 1,
+                'permissions' => ['is_admin' => true, 'can_view_stats' => true],
+                'first_name' => $user->fullname,
+            ]);
+
+            $this->auditService->log(
+                action: 'tontine.individual.created',
+                actorUserId: $user->id,
+                auditableType: 'tontine',
+                auditableId: $tontine->id,
+                metadata: [
+                    'amount' => $tontine->amount_per_installment,
+                    'frequency' => $tontine->frequency,
+                    'target_date' => $tontine->target_payout_date?->toDateString(),
+                ],
+            );
+
+            return $tontine->load('members');
+        });
+    }
+
     public function update(int $tontineId, User $user, array $data): Tontine
     {
         $tontine = Tontine::query()->findOrFail($tontineId);
@@ -578,6 +626,12 @@ class TontineService
 
     public function checkAndProcessPayout(Tontine $tontine, int $cycle): void
     {
+        if ($tontine->type === 'individual') {
+            // Pour les tontines individuelles, le reversement ne se fait pas à chaque cycle,
+            // mais uniquement à la date cible définie (target_payout_date) de manière globale.
+            return;
+        }
+
         // 1. Check if everyone in this cycle has paid
         $expectedCount = $tontine->members()->where('status', 'accepted')->count();
         $paidMemberIds = $tontine->payments()
@@ -830,5 +884,62 @@ class TontineService
         ]);
 
         $this->executePayout($tontine, $beneficiary, $cycle, $beneficiaryAmount, $creatorAmount, $platformAmount, $totalAmount);
+    }
+
+    public function withdrawIndividual(int $tontineId, User $user): \App\Models\TontinePayout
+    {
+        $tontine = Tontine::query()->findOrFail($tontineId);
+
+        if ($tontine->type !== 'individual') {
+            throw ValidationException::withMessages(['tontine_id' => ['Cette action est réservée aux tontines individuelles.']]);
+        }
+
+        if ((int) $tontine->user_id !== (int) $user->id) {
+            throw ValidationException::withMessages(['tontine_id' => ['Vous n\'êtes pas propriétaire.']]);
+        }
+
+        if ($tontine->status === 'closed') {
+            throw ValidationException::withMessages(['tontine_id' => ['Cette tontine est déjà clôturée.']]);
+        }
+        
+        if (!$tontine->target_payout_date || now()->startOfDay()->lt($tontine->target_payout_date->startOfDay())) {
+            throw ValidationException::withMessages(['tontine_id' => ['La date de retrait n\'est pas encore atteinte (prévue le ' . ($tontine->target_payout_date?->format('d/m/Y') ?? 'inconnu') . ').']]);
+        }
+
+        $totalSaved = (float) $tontine->payments()->where('status', 'success')->sum('amount');
+        if ($totalSaved <= 0) {
+            throw ValidationException::withMessages(['tontine_id' => ['Vous n\'avez encore rien épargné.']]);
+        }
+        
+        return DB::transaction(function () use ($tontine, $user, $totalSaved) {
+            $member = $tontine->members()->first();
+            
+            $platformPct = (float) config('services.platform.tontine_payout_commission_rate', 0.01);
+            $platformAmount = round($totalSaved * $platformPct, 2);
+            $beneficiaryAmount = $totalSaved - $platformAmount;
+            
+            // Le cycle_number est fixé à 1 pour la tontine individuelle
+            $this->executePayout(
+                tontine: $tontine, 
+                beneficiary: $member, 
+                cycle: 1, 
+                beneficiaryAmount: $beneficiaryAmount, 
+                creatorAmount: 0, 
+                platformAmount: $platformAmount, 
+                totalAmount: $totalSaved
+            );
+
+            $tontine->update(['status' => 'closed']);
+
+            $this->auditService->log(
+                action: 'tontine.individual.withdrawn',
+                actorUserId: $user->id,
+                auditableType: 'tontine',
+                auditableId: $tontine->id,
+                metadata: ['total_saved' => $totalSaved, 'beneficiary_amount' => $beneficiaryAmount]
+            );
+            
+            return $tontine->payouts()->latest()->first();
+        });
     }
 }

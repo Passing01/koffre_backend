@@ -30,11 +30,14 @@ class Tontine extends Model
         'status',
         'moderation_reason',
         'is_random_payout',
+        'type',
+        'target_payout_date',
     ];
 
     protected $casts = [
         'amount_per_installment' => 'decimal:2',
         'starts_at' => 'datetime',
+        'target_payout_date' => 'date',
         'creator_percentage' => 'decimal:2',
         'notification_settings' => 'array',
         'late_fee_amount' => 'decimal:2',
