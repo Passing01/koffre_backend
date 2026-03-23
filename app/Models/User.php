@@ -70,4 +70,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(Contribution::class);
     }
+
+    public function tontineMembers(): HasMany
+    {
+        return $this->hasMany(TontineMember::class);
+    }
+
+    public function tontines()
+    {
+        return $this->hasManyThrough(Tontine::class, TontineMember::class);
+    }
 }

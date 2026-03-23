@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Cagnottes\CagnotteController;
 use App\Http\Controllers\Api\Cagnottes\CagnotteInteractionController;
 use App\Http\Controllers\Api\Cagnottes\CagnotteTransactionController;
 use App\Http\Controllers\Api\Contributions\ContributionController;
+use App\Http\Controllers\Api\Users\UserTransactionController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -69,6 +70,7 @@ Route::middleware(['auth:sanctum', 'check.blocked'])->group(function () {
     Route::post('/contribute/initiate', [ContributionController::class, 'initiate']);
     Route::post('/contribute/retry/{reference}', [ContributionController::class, 'retry']);
     Route::get('/my-contributions', [ContributionController::class, 'listMine']);
+    Route::get('/my-transactions', [UserTransactionController::class, 'index']);
 
     // Profile routes
     Route::get('/me', [\App\Http\Controllers\Api\Users\ProfileController::class, 'show']);
