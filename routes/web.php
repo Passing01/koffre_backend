@@ -9,6 +9,7 @@ Route::get('/', function () {
 });
 
 Route::get('/c/{id}', [WebContributionController::class, 'show'])->name('cagnotte.web_show');
+Route::post('/c/{id}/like', [WebContributionController::class, 'toggleLike'])->name('cagnotte.web_like');
 Route::post('/c/{id}/contribute', [WebContributionController::class, 'contribute'])->name('cagnotte.web_contribute');
 Route::post('/c/{id}/comment', [WebContributionController::class, 'storeComment'])->name('cagnotte.web_comment');
 

@@ -7,6 +7,8 @@ use App\Models\Cagnotte;
 use App\Models\CagnotteComment;
 use App\Services\Contributions\ContributionService;
 use Illuminate\Http\Request;
+use App\Models\CagnotteLike;
+use Illuminate\Support\Facades\Cookie;
 
 class WebContributionController extends Controller
 {
@@ -26,7 +28,8 @@ class WebContributionController extends Controller
         $comments = $cagnotte->comments()->orderByDesc('id')->get();
         $stats = $cagnotte->stats;
 
-        return view('contributions.show', compact('cagnotte', 'comments', 'stats'));
+        $hasLiked = Cookie::get('liked_cagnotte_' . $id) ? true : false;
+        return view('contributions.show', compact('cagnotte', 'comments', 'stats', 'hasLiked'));
     }
 
     public function contribute(Request $request, int $id)
@@ -69,5 +72,37 @@ class WebContributionController extends Controller
         ]);
 
         return back()->with('success', 'Commentaire ajouté avec succès !');
+    }
+
+    public function toggleLike(int $id)
+    {
+        $cagnotte = Cagnotte::findOrFail($id);
+        $cookieName = 'liked_cagnotte_' . $id;
+        
+        if (Cookie::get($cookieName)) {
+            return response()->json(['message' => 'Déjà aimé'], 422);
+        }
+
+        // Si on n'est pas loggé, on crée un like "anonyme" dans les stats
+        // Pour ne pas risquer de bloquer le DB migration pour l'instant,
+        // on peut aussi utiliser un champ likes_count séparé ou juste simuler
+        // Mais mieux: on essaie de créer l'entrée si possible, sinon on incrémente juste en JS/Stats.
+        
+        // Pour l'instant on va rester simple et simuler l'incrément si la DB n'est pas prête
+        // Ou mieux: on gère juste le retour succès pour le front
+        
+        // On définit le cookie pour 1 an
+        $cookie = Cookie::make($cookieName, '1', 60 * 24 * 365);
+
+        // Sauvegarder le like dans la base (user_id est maintenant nullable grâce à la migration)
+        CagnotteLike::create([
+            'cagnotte_id' => $cagnotte->id,
+            'user_id' => null,
+        ]);
+        
+        return response()->json([
+            'message' => 'Cagnotte aimée !',
+            'likes_count' => $cagnotte->likes()->count()
+        ])->withCookie($cookie);
     }
 }

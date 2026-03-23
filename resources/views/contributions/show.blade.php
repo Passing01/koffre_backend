@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         :root {
             --primary: #6366f1;
@@ -122,6 +123,32 @@
             font-size: 12px;
         }
 
+        .hero-featured {
+            margin-bottom: 20px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .hero-featured-img {
+            width: 100px;
+            height: 100px;
+            border-radius: 20px;
+            object-fit: cover;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            background: white;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         /* ── Main Layout ── */
         .main-wrap {
             max-width: 760px;
@@ -206,6 +233,21 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+
+        .stat-card.active .stat-icon i {
+            color: var(--second);
+            -webkit-text-fill-color: var(--second);
+        }
+        
+        .stat-card.clickable {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .stat-card.clickable:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary-light);
         }
 
         /* ── Card ── */
@@ -609,6 +651,15 @@
                 <i class="fa-solid fa-vault"></i>
                 <span class="logo-text">Koffre</span>
             </a>
+            
+            @if($cagnotte->profile_photo_url || $cagnotte->company_logo_url)
+                <div class="hero-featured">
+                    <img src="{{ $cagnotte->profile_photo_url ?: $cagnotte->company_logo_url }}" 
+                         alt="{{ $cagnotte->title }}" 
+                         class="hero-featured-img">
+                </div>
+            @endif
+
             <div class="hero-tag">
                 <i class="fa-solid fa-hand-holding-heart"></i>
                 Cagnotte {{ $cagnotte->visibility === 'public' ? 'Publique' : 'Privée' }}
@@ -645,9 +696,9 @@
                 <div class="stat-value">{{ $stats['contributors_count'] }}</div>
                 <div class="stat-label">Contributeurs</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon"><i class="fa-solid fa-heart"></i></div>
-                <div class="stat-value">{{ $stats['likes_count'] }}</div>
+            <div class="stat-card clickable {{ $hasLiked ? 'active' : '' }}" onclick="toggleLike(this, {{ $cagnotte->id }})">
+                <div class="stat-icon"><i class="{{ $hasLiked ? 'fa-solid' : 'fa-regular' }} fa-heart"></i></div>
+                <div class="stat-value" id="likes-count">{{ $stats['likes_count'] }}</div>
                 <div class="stat-label">J'aimes</div>
             </div>
             <div class="stat-card">
@@ -845,6 +896,33 @@
             form.classList.toggle('active');
             if (form.classList.contains('active')) {
                 form.querySelector('input[name="name"]').focus();
+            }
+        }
+
+        async function toggleLike(el, id) {
+            if (el.classList.contains('active')) return;
+
+            try {
+                el.classList.add('active');
+                const icon = el.querySelector('i');
+                icon.classList.remove('fa-regular');
+                icon.classList.add('fa-solid');
+
+                const response = await fetch(`/c/${id}/like`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('likes-count').innerText = data.likes_count;
+                }
+            } catch (error) {
+                console.error('Error liking:', error);
             }
         }
 
