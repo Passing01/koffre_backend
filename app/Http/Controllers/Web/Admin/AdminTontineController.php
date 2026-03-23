@@ -33,6 +33,11 @@ class AdminTontineController extends Controller
             $query->where('frequency', $request->frequency);
         }
 
+        // Filtre par type (group / individual)
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
         // Recherche
         if ($request->filled('search')) {
             $search = $request->search;
@@ -54,9 +59,11 @@ class AdminTontineController extends Controller
         $tontines = $query->paginate(20);
 
         $stats = [
-            'total' => Tontine::count(),
-            'active' => Tontine::where('status', 'active')->count(),
-            'disabled' => Tontine::where('status', 'disabled')->count(),
+            'total'       => Tontine::count(),
+            'active'      => Tontine::where('status', 'active')->count(),
+            'disabled'    => Tontine::where('status', 'disabled')->count(),
+            'individual'  => Tontine::where('type', 'individual')->count(),
+            'group'       => Tontine::where('type', 'group')->count(),
         ];
 
         return view('admin.tontines.index', compact('tontines', 'stats'));

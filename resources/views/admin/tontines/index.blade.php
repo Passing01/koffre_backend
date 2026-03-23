@@ -29,41 +29,31 @@
         @endif
 
         {{-- Stats rapides --}}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="stat-card rounded-2xl p-6 text-white shadow-lg">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-white/80 text-sm font-medium">Total Tontines</p>
-                        <p class="text-4xl font-bold mt-2">{{ number_format($stats['total']) }}</p>
-                    </div>
-                    <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                        <i class="fas fa-circle-nodes text-3xl"></i>
-                    </div>
-                </div>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div class="md:col-span-1 stat-card rounded-2xl p-5 text-white shadow-lg">
+                <p class="text-white/80 text-xs font-medium">Total</p>
+                <p class="text-3xl font-bold mt-1">{{ number_format($stats['total']) }}</p>
+                <p class="text-white/60 text-xs mt-1"><i class="fas fa-circle-nodes"></i> Tontines</p>
             </div>
-            <div class="rounded-2xl p-6 text-white shadow-lg"
-                style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-white/80 text-sm font-medium">Actives</p>
-                        <p class="text-4xl font-bold mt-2">{{ number_format($stats['active']) }}</p>
-                    </div>
-                    <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                        <i class="fas fa-check-circle text-3xl"></i>
-                    </div>
-                </div>
+            <div class="rounded-2xl p-5 text-white shadow-lg" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)">
+                <p class="text-white/80 text-xs font-medium">Actives</p>
+                <p class="text-3xl font-bold mt-1">{{ number_format($stats['active']) }}</p>
+                <p class="text-white/60 text-xs mt-1"><i class="fas fa-check-circle"></i> En cours</p>
             </div>
-            <div class="rounded-2xl p-6 text-white shadow-lg"
-                style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-white/80 text-sm font-medium">Désactivées</p>
-                        <p class="text-4xl font-bold mt-2">{{ number_format($stats['disabled']) }}</p>
-                    </div>
-                    <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                        <i class="fas fa-ban text-3xl"></i>
-                    </div>
-                </div>
+            <div class="rounded-2xl p-5 text-white shadow-lg" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%)">
+                <p class="text-white/80 text-xs font-medium">Désactivées</p>
+                <p class="text-3xl font-bold mt-1">{{ number_format($stats['disabled']) }}</p>
+                <p class="text-white/60 text-xs mt-1"><i class="fas fa-ban"></i> Modérées</p>
+            </div>
+            <div class="rounded-2xl p-5 text-white shadow-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)">
+                <p class="text-white/80 text-xs font-medium">Groupe</p>
+                <p class="text-3xl font-bold mt-1">{{ number_format($stats['group']) }}</p>
+                <p class="text-white/60 text-xs mt-1"><i class="fas fa-users"></i> Multi-membres</p>
+            </div>
+            <div class="rounded-2xl p-5 text-white shadow-lg" style="background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%)">
+                <p class="text-white/80 text-xs font-medium">Individuelle</p>
+                <p class="text-3xl font-bold mt-1">{{ number_format($stats['individual']) }}</p>
+                <p class="text-white/60 text-xs mt-1"><i class="fas fa-piggy-bank"></i> Épargne perso</p>
             </div>
         </div>
 
@@ -95,6 +85,15 @@
                         <option value="months" {{ request('frequency') === 'months' ? 'selected' : '' }}>Mensuel</option>
                     </select>
                 </div>
+                <div class="w-44">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select name="type"
+                        class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">Tous</option>
+                        <option value="group" {{ request('type') === 'group' ? 'selected' : '' }}>Groupe</option>
+                        <option value="individual" {{ request('type') === 'individual' ? 'selected' : '' }}>Individuelle</option>
+                    </select>
+                </div>
                 <div class="flex gap-2">
                     <button type="submit"
                         class="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-sm font-medium hover:opacity-90 transition">
@@ -116,9 +115,11 @@
                         <tr>
                             <th class="text-left px-6 py-4 font-semibold text-gray-600">Tontine</th>
                             <th class="text-left px-6 py-4 font-semibold text-gray-600">Créateur</th>
+                            <th class="text-center px-6 py-4 font-semibold text-gray-600">Type</th>
                             <th class="text-center px-6 py-4 font-semibold text-gray-600">Membres</th>
                             <th class="text-center px-6 py-4 font-semibold text-gray-600">Cotisation</th>
                             <th class="text-center px-6 py-4 font-semibold text-gray-600">Fréquence</th>
+                            <th class="text-center px-6 py-4 font-semibold text-gray-600">Date retrait</th>
                             <th class="text-center px-6 py-4 font-semibold text-gray-600">Statut</th>
                             <th class="text-center px-6 py-4 font-semibold text-gray-600">Créée le</th>
                             <th class="text-center px-6 py-4 font-semibold text-gray-600">Actions</th>
@@ -144,6 +145,17 @@
                                     <p class="text-xs text-gray-500">{{ $tontine->user->phone ?? '' }}</p>
                                 </td>
                                 <td class="px-6 py-4 text-center">
+                                    @if($tontine->type === 'individual')
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
+                                            <i class="fas fa-piggy-bank"></i> Individuelle
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+                                            <i class="fas fa-users"></i> Groupe
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4 text-center">
                                     <span class="inline-flex items-center gap-1 font-semibold text-gray-700">
                                         <i class="fas fa-users text-purple-400"></i>
                                         {{ $tontine->members->count() }}
@@ -159,6 +171,16 @@
                                     @endphp
                                     {{ $tontine->frequency_number }}
                                     {{ $freqLabels[$tontine->frequency] ?? $tontine->frequency }}
+                                </td>
+                                <td class="px-6 py-4 text-center text-sm">
+                                    @if($tontine->type === 'individual' && $tontine->target_payout_date)
+                                        <span class="font-medium text-orange-600">
+                                            <i class="fas fa-calendar-alt mr-1"></i>
+                                            {{ $tontine->target_payout_date->format('d/m/Y') }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-400">—</span>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 text-center">
                                     @if($tontine->status === 'active')
@@ -201,7 +223,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-6 py-16 text-center text-gray-400">
+                                <td colspan="10" class="px-6 py-16 text-center text-gray-400">
                                     <i class="fas fa-circle-nodes text-5xl mb-4 block opacity-30"></i>
                                     Aucune tontine trouvée.
                                 </td>
