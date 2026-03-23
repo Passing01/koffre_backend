@@ -25,6 +25,7 @@ class UpdateTontineRequest extends FormRequest
             'late_fee_amount' => 'nullable|numeric|min:0',
             'requires_member_registration' => 'nullable|boolean',
             'status' => 'sometimes|in:pending,active,completed,cancelled',
+            'target_payout_date' => 'nullable|date',
         ];
     }
 }
