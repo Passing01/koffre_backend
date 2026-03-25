@@ -341,11 +341,13 @@ class CagnotteService
             ]);
         }
 
-        if ($cagnotte->is_private_coffre) {
+        // Les cagnottes privées (type cotisation) peuvent désormais être débloquées à tout moment.
+        /* if ($cagnotte->is_private_coffre) {
             throw ValidationException::withMessages([
                 'cagnotte_id' => ['Le système privé/coffre ne permet pas de déblocage anticipé.'],
             ]);
-        }
+        } */
+
 
         if ($cagnotte->unlock_status === 'pending') {
             throw ValidationException::withMessages([
@@ -395,11 +397,15 @@ class CagnotteService
         }
 
         return DB::transaction(function () use ($cagnotte, $adminUser) {
-            // Déblocage 48h (2 jours ouvrables) après la DEMANDE
-            $releaseDate = $cagnotte->unlock_requested_at->copy()->addWeekdays(2);
+            // Déblocage 48h (2 jours ouvrables) après la DEMANDE pour les cagnottes publiques
+            // Pour les cagnottes privées (cotisations), le déblocage est immédiat après approbation admin
+            if ($cagnotte->is_private_coffre) {
+                $unlockedAt = now();
+            } else {
+                $releaseDate = $cagnotte->unlock_requested_at->copy()->addWeekdays(2);
+                $unlockedAt = $releaseDate->isPast() ? now() : $releaseDate;
+            }
 
-            // Si les 48h sont déjà passées, le déblocage est immédiat
-            $unlockedAt = $releaseDate->isPast() ? now() : $releaseDate;
 
             $cagnotte->update([
                 'unlock_status' => 'approved',

@@ -38,8 +38,10 @@ class StoreIndividualTontineRequest extends FormRequest
                     }
                 }
             ],
+            'identity_document' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'payout_mode' => ['required', 'in:manual,automatic'],
             'notification_settings' => ['nullable', 'array'],
+
         ];
     }
 }

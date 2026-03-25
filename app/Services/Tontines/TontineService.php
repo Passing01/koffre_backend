@@ -161,6 +161,12 @@ class TontineService
                 $data['target_payout_date'] = Carbon::parse($data['target_payout_date'])->endOfDay();
             }
 
+            if (isset($data['identity_document'])) {
+                $data['identity_document_path'] = $data['identity_document']->store('tontines/documents', 'public');
+                unset($data['identity_document']);
+            }
+
+
             /** @var Tontine $tontine */
             $tontine = Tontine::query()->create($data);
 
