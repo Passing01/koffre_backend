@@ -19,7 +19,7 @@ class StoreIndividualTontineRequest extends FormRequest
             'description' => ['nullable', 'string'],
             'amount_per_installment' => ['required', 'numeric', 'min:100'],
             'currency' => ['required', 'string', 'size:3'],
-            'frequency' => ['required', 'in:daily,weekly,biweekly,monthly'],
+            'frequency' => ['required', 'in:days,weeks,months'],
             'frequency_number' => ['required', 'integer', 'min:1'],
             'starts_at' => ['required', 'date', 'after_or_equal:today'],
             'target_payout_date' => [
