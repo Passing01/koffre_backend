@@ -21,6 +21,9 @@ class Tontine extends Model
         'frequency_number',
         'starts_at',
         'payout_mode',
+        'payout_method',
+        'payout_account',
+
         'creator_percentage',
         'identity_document_path',
         'notification_settings',

@@ -741,13 +741,14 @@ class TontineService
             }
 
             $ref = 'TON-PAY-' . $tontine->id . '-' . $cycle;
-            $beneficiaryAccount = $beneficiary->user?->phone ?? $beneficiary->phone;
+            $beneficiaryAccount = $tontine->payout_account ?? ($beneficiary->user?->phone ?? $beneficiary->phone);
             $success = $this->paymentService->payout(
                 account: $beneficiaryAccount,
                 amount: (float) $beneficiaryAmount,
                 description: "Versement Tontine: {$tontine->title} - Cycle #{$cycle}",
-                method: null
+                method: $tontine->payout_method
             );
+
 
             if ($success && $creatorAmount > 0 && $tontine->user?->phone) {
                 $this->paymentService->payout(
