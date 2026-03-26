@@ -38,7 +38,7 @@ class StoreIndividualTontineRequest extends FormRequest
                     }
                 }
             ],
-            'identity_document' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'identity_document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'payout_method' => ['required', 'string', 'max:50'],
             'payout_account' => ['required', 'string', 'max:255'],
             'payout_mode' => ['required', 'in:manual,automatic'],

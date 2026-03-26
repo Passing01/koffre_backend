@@ -29,7 +29,7 @@ class StorePrivateCagnotteRequest extends FormRequest
 
             // KYC (Always Physique for Private)
             'profile_photo' => ['required', 'file', 'image', 'max:5120'],
-            'identity_document' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'identity_document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
 
             'participants' => ['nullable', 'array'],
             'participants.*' => ['required', 'string'],
