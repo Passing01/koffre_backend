@@ -4,6 +4,7 @@ namespace App\Services\Contributions;
 
 use App\Models\Cagnotte;
 use App\Models\Contribution;
+use App\Models\Earning;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Audit\AuditService;
@@ -37,13 +38,19 @@ class ContributionService
         }
 
         $reference = 'KOF-' . Str::upper(Str::random(12));
+        
+        $commissionRate = (float) config('services.platform.commission_rate', 0.01);
+        $platformFee = round($amount * $commissionRate, 2);
+        $totalCharged = $amount + $platformFee;
 
-        return DB::transaction(function () use ($cagnotte, $amount, $actor, $contributorName, $paymentMethod, $reference) {
+        return DB::transaction(function () use ($cagnotte, $amount, $platformFee, $totalCharged, $actor, $contributorName, $paymentMethod, $reference) {
             $contribution = Contribution::query()->create([
                 'cagnotte_id' => $cagnotte->id,
                 'user_id' => $actor?->id,
                 'contributor_name' => $contributorName ?? $actor?->fullname,
                 'amount' => $amount,
+                'platform_fee' => $platformFee,
+                'total_charged' => $totalCharged,
                 'payment_reference' => $reference,
                 'payment_status' => 'pending',
                 'payment_method' => $paymentMethod ?? config('services.default_gateway') ?? 'geniuspay',
@@ -51,9 +58,9 @@ class ContributionService
 
             $paymentData = $this->paymentService->initiatePayment(
                 transactionId: $reference,
-                amount: $amount,
+                amount: (float) $totalCharged,
                 currency: 'XOF',
-                description: "Contribution à la cagnotte: {$cagnotte->title}",
+                description: "Contribution à la cagnotte: {$cagnotte->title} (Montant: {$amount} + Frais: {$platformFee})",
                 customer: [
                     'name' => $actor?->fullname ?? $contributorName ?? 'Invité',
                     'email' => $actor?->email ?? 'guest@kofre.com',
@@ -100,6 +107,20 @@ class ContributionService
                 'balance_after' => $newBalance,
                 'reference' => $reference,
             ]);
+
+            // Enregistrer le gain plateforme (earnings)
+            if ($contribution->platform_fee > 0) {
+                Earning::query()->create([
+                    'module' => 'cagnotte',
+                    'amount' => (float) $contribution->platform_fee,
+                    'reference' => 'EARN-CAG-' . $reference,
+                    'metadata' => [
+                        'cagnotte_id' => $cagnotte->id,
+                        'contribution_id' => $contribution->id,
+                        'total_charged' => $contribution->total_charged,
+                    ],
+                ]);
+            }
 
             $this->auditService->log(
                 action: 'contribution.completed',
@@ -219,12 +240,12 @@ class ContributionService
             ]);
         }
 
-        // Générer un nouveau lien de paiement avec la même référence
+        // Générer un nouveau lien de paiement avec la même référence et le montant total
         $paymentData = $this->paymentService->initiatePayment(
             transactionId: $contribution->payment_reference,
-            amount: (float) $contribution->amount,
+            amount: (float) $contribution->total_charged,
             currency: 'XOF',
-            description: "Contribution à la cagnotte: {$cagnotte->title}",
+            description: "Contribution à la cagnotte: {$cagnotte->title} (Montant: {$contribution->amount} + Frais: {$contribution->platform_fee})",
             customer: [
                 'name'  => $actor?->fullname ?? $contribution->contributor_name ?? 'Invité',
                 'email' => $actor?->email ?? 'guest@kofre.com',

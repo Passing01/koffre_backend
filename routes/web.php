@@ -64,6 +64,7 @@ Route::prefix('admin')->middleware(['auth', 'admin', 'check.blocked'])->group(fu
 
     Route::get('/transactions', [\App\Http\Controllers\Web\Admin\AdminTransactionController::class , 'index'])->name('admin.transactions.index');
     Route::get('/platform-earnings', [\App\Http\Controllers\Web\Admin\AdminPlatformEarningController::class , 'index'])->name('admin.platform-earnings.index');
+    Route::post('/platform-earnings/transfer', [\App\Http\Controllers\Web\Admin\AdminPlatformEarningController::class , 'transfer'])->name('admin.platform-earnings.transfer');
 
     // Audit Logs
     Route::get('/audit', [\App\Http\Controllers\Web\Admin\AdminAuditLogController::class , 'index'])->name('admin.audit.index');

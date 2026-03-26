@@ -4,6 +4,7 @@ namespace App\Services\Tontines;
 
 use App\Models\Tontine;
 use App\Models\TontineMember;
+use App\Models\Earning;
 use App\Models\User;
 use App\Services\Audit\AuditService;
 use App\Services\Notifications\FcmService;
@@ -590,7 +591,21 @@ class TontineService
             $payment->update(['status' => 'success']);
             $tontine = $payment->tontine;
 
-            // Enregistrer la commission plateforme (4,5%) à la contribution
+            // Enregistrer la commission plateforme (Earnings global)
+            if ($payment->platform_fee > 0) {
+                Earning::query()->create([
+                    'module' => 'tontine',
+                    'amount' => (float) $payment->platform_fee,
+                    'reference' => 'EARN-TON-' . $payment->payment_reference,
+                    'metadata' => [
+                        'tontine_id' => $tontine->id,
+                        'payment_id' => $payment->id,
+                        'member_id' => $payment->tontine_member_id,
+                    ],
+                ]);
+            }
+            
+            // On garde TontineEarning pour la compatibilité existante si besoin
             if ($payment->platform_fee > 0) {
                 \App\Models\TontineEarning::query()->create([
                     'tontine_id' => $tontine->id,
@@ -677,10 +692,9 @@ class TontineService
 
         $totalAmount = (float) $tontine->payments()->where('cycle_number', $cycle)->where('status', 'success')->sum('amount');
         $creatorPct = (float) ($tontine->creator_percentage ?? 0);
-        $platformPct = (float) config('services.platform.tontine_payout_commission_rate', 0.01);
         $creatorAmount = round($totalAmount * ($creatorPct / 100), 2);
-        $platformAmount = round($totalAmount * $platformPct, 2);
-        $beneficiaryAmount = $totalAmount - $creatorAmount - $platformAmount;
+        $platformAmount = 0; // Déjà pris au dépôt (4.5%)
+        $beneficiaryAmount = $totalAmount - $creatorAmount;
         $paidCount = count($paidMemberIds);
 
         if ($paidCount < $expectedCount) {
@@ -819,10 +833,9 @@ class TontineService
 
             $totalAmount = (float) $tontine->payments()->where('cycle_number', $cycle)->where('status', 'success')->sum('amount');
             $creatorPct = (float) ($tontine->creator_percentage ?? 0);
-            $platformPct = (float) config('services.platform.tontine_payout_commission_rate', 0.01);
             $creatorAmount = round($totalAmount * ($creatorPct / 100), 2);
-            $platformAmount = round($totalAmount * $platformPct, 2);
-            $beneficiaryAmount = $totalAmount - $creatorAmount - $platformAmount;
+            $platformAmount = 0; // Déjà pris au dépôt
+            $beneficiaryAmount = $totalAmount - $creatorAmount;
 
             $this->executePayout($tontine, $beneficiary, $cycle, $beneficiaryAmount, $creatorAmount, $platformAmount, $totalAmount);
 
@@ -875,10 +888,9 @@ class TontineService
 
         $totalAmount     = (float) $tontine->payments()->where('cycle_number', $cycle)->where('status', 'success')->sum('amount');
         $creatorPct      = (float) ($tontine->creator_percentage ?? 0);
-        $platformPct     = (float) config('services.platform.tontine_payout_commission_rate', 0.01);
         $creatorAmount   = round($totalAmount * ($creatorPct / 100), 2);
-        $platformAmount  = round($totalAmount * $platformPct, 2);
-        $beneficiaryAmount = $totalAmount - $creatorAmount - $platformAmount;
+        $platformAmount  = 0; // Déjà pris au dépôt
+        $beneficiaryAmount = $totalAmount - $creatorAmount;
 
         Log::info('Admin Retry Payout', [
             'admin'        => $adminUser->id,
@@ -921,9 +933,8 @@ class TontineService
         return DB::transaction(function () use ($tontine, $user, $totalSaved) {
             $member = $tontine->members()->first();
             
-            $platformPct = (float) config('services.platform.tontine_payout_commission_rate', 0.01);
-            $platformAmount = round($totalSaved * $platformPct, 2);
-            $beneficiaryAmount = $totalSaved - $platformAmount;
+            $platformAmount = 0; // Déjà pris au dépôt (4.5%)
+            $beneficiaryAmount = $totalSaved;
             
             // Le cycle_number est fixé à 1 pour la tontine individuelle
             $this->executePayout(

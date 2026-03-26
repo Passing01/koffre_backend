@@ -16,6 +16,8 @@ class Contribution extends Model
         'user_id',
         'contributor_name',
         'amount',
+        'platform_fee',
+        'total_charged',
         'payment_reference',
         'payment_status',
         'payment_method',
@@ -23,6 +25,8 @@ class Contribution extends Model
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'platform_fee' => 'decimal:2',
+        'total_charged' => 'decimal:2',
     ];
 
     public function cagnotte(): BelongsTo

@@ -82,10 +82,9 @@ return [
     'default_gateway' => env('PAYMENT_GATEWAY', 'paydunya') ?: 'paydunya',
 
     'platform' => [
-        'commission_rate' => env('PLATFORM_COMMISSION_RATE', 0.01), // 1% cagnottes
-        'tontine_payment_fee_rate' => env('TONTINE_PAYMENT_FEE_RATE', 0.045), // 4,5% à la contribution (frais GeniusPay inclus)
-        'tontine_payout_commission_rate' => env('TONTINE_PAYOUT_COMMISSION_RATE', 0.01), // 1% au transfert bénéficiaire
-        'payout_phone' => env('PLATFORM_PAYOUT_PHONE'), // Numéro pour recevoir les commissions plateforme tontine
+        'commission_rate' => env('PLATFORM_COMMISSION_RATE', 0.048), // 4,8% cagnottes (PayDunya inclus)
+        'tontine_payment_fee_rate' => env('TONTINE_PAYMENT_FEE_RATE', 0.048), // 4,8% tontines au dépôt (PayDunya inclus)
+        'payout_phone' => env('PLATFORM_PAYOUT_PHONE'), // Numéro pour recevoir les commissions plateforme
     ],
 
 ];

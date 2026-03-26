@@ -490,9 +490,7 @@ class CagnotteService
         return DB::transaction(function () use ($cagnotte, $adminUser) {
             $payoutAccount = $cagnotte->payout_account ?? $cagnotte->user->phone;
 
-            $commissionRate = (float) config('services.platform.commission_rate', 0.01);
-            $commission = (float) $cagnotte->current_amount * $commissionRate;
-            $netAmount = (float) $cagnotte->current_amount - $commission;
+            $netAmount = (float) $cagnotte->current_amount;
 
             $success = $this->paymentService->payout(
                 account: $payoutAccount,

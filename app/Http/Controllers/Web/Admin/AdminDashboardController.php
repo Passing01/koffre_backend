@@ -7,6 +7,7 @@ use App\Models\Cagnotte;
 use App\Models\Contribution;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Models\Earning;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -22,6 +23,7 @@ class AdminDashboardController extends Controller
             'total_users' => User::count(),
             'total_contributions' => Contribution::count(),
             'total_amount_collected' => Contribution::where('payment_status', 'success')->sum('amount'),
+            'total_platform_earnings' => Earning::sum('amount'),
             'pending_contributions' => Contribution::where('payment_status', 'pending')->count(),
             'failed_contributions' => Contribution::where('payment_status', 'failed')->count(),
         ];
