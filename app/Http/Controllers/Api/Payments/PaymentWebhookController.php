@@ -11,8 +11,9 @@ use Illuminate\Support\Facades\Log;
 class PaymentWebhookController extends Controller
 {
     public function __construct(
-        private readonly PaymentServiceInterface $paymentService,
-        private readonly ContributionService $contributionService
+        private readonly \App\Services\Payments\PaymentServiceInterface $paymentService,
+        private readonly \App\Services\Contributions\ContributionService $contributionService,
+        private readonly \App\Services\Tontines\TontineService $tontineService
     ) {
     }
 
@@ -81,30 +82,63 @@ class PaymentWebhookController extends Controller
 
     public function handlePayDunya(Request $request)
     {
-        Log::info('PayDunya IPN Received', $request->all());
+        Log::info('PayDunya IPN Received', [
+            'method' => $request->method(),
+            'body' => $request->all()
+        ]);
 
         $token = $request->input('token');
+        // PayDunya sends custom_data as an array if sent as array in initiatePayment
+        $customData = $request->input('custom_data', []);
+        $internalRef = $customData['transaction_id'] ?? null;
 
         if (!$token) {
+            Log::error('PayDunya IPN: Token missing in request');
             return response()->json(['message' => 'Token missing'], 400);
         }
 
         try {
+            // Re-vérifier l'authenticité auprès de PayDunya
             if ($this->paymentService->verifyPayment($token)) {
-                $contribution = \App\Models\Contribution::where('payment_reference', $token)->first();
+                
+                // 1. Chercher par la référence interne (KOF-... ou TON-...)
+                if ($internalRef) {
+                    if (str_starts_with($internalRef, 'TON-')) {
+                        $tontineService = app(\App\Services\Tontines\TontineService::class);
+                        $tontineService->completePayment($internalRef);
+                        return response()->json(['message' => 'Tontine IPN Processed']);
+                    }
 
-                if ($contribution) {
-                    $this->contributionService->complete($contribution->payment_reference);
+                    $contribution = \App\Models\Contribution::where('payment_reference', $internalRef)->first();
+                    if ($contribution) {
+                        $this->contributionService->complete($internalRef);
+                        return response()->json(['message' => 'Contribution IPN Processed']);
+                    }
                 }
 
-                return response()->json(['message' => 'IPN Processed']);
+                // 2. Fallback: Chercher par le token (si stocké dans payment_reference par erreur ou rétrocompatibilité)
+                $contribution = \App\Models\Contribution::where('payment_reference', $token)->first();
+                if ($contribution) {
+                    $this->contributionService->complete($contribution->payment_reference);
+                    return response()->json(['message' => 'IPN Processed (found by token)']);
+                }
+
+                Log::warning('PayDunya IPN: Reference not found in DB', [
+                    'token' => $token,
+                    'internalRef' => $internalRef
+                ]);
+            } else {
+                Log::warning('PayDunya IPN: Verification failed for token ' . $token);
             }
         } catch (\Exception $e) {
-            Log::error('PayDunya IPN processing error', ['error' => $e->getMessage()]);
+            Log::error('PayDunya IPN processing error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json(['message' => 'Error'], 500);
         }
 
-        return response()->json(['message' => 'Notification received']);
+        return response()->json(['message' => 'Notification received and acknowledged']);
     }
 
     public function handleGeniusPay(Request $request)

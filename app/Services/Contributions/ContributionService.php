@@ -68,7 +68,10 @@ class ContributionService
                 ]
             );
 
-            // Ne pas écraser payment_reference : le webhook utilise metadata.order_id = notre référence (KOF-xxx)
+            // Mettre à jour l'ID externe si disponible (token PayDunya)
+            if (!empty($paymentData['payment_token'])) {
+                $contribution->update(['payment_reference_external' => $paymentData['payment_token']]);
+            }
 
             return [
                 'contribution' => $contribution,

@@ -48,7 +48,7 @@ class PayDunyaService implements PaymentServiceInterface
             'PAYDUNYA-TOKEN' => $this->token,
         ])->post("{$this->baseUrl}/checkout-invoice/create", [
                     'invoice' => [
-                        'total_amount' => (float) $amount,
+                        'total_amount' => (int) round($amount),
                         'description' => $description,
                     ],
                     'store' => [
@@ -132,7 +132,7 @@ class PayDunyaService implements PaymentServiceInterface
                 'PAYDUNYA-TOKEN' => $this->token,
             ])->post("https://app.paydunya.com/api/v2/disburse/get-invoice", [
                 'account_alias' => $accountAlias,
-                'amount' => (int) $amount,
+                'amount' => (int) round($amount),
                 'withdraw_mode' => $withdrawMode,
                 'callback_url' => route('payments.callback', ['provider' => 'paydunya', 'event' => 'payout.completed']),
             ]);
