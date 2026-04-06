@@ -190,7 +190,7 @@ class TontineService
                 metadata: [
                     'amount' => $tontine->amount_per_installment,
                     'frequency' => $tontine->frequency,
-                    'target_date' => $tontine->target_payout_date?->toDateString(),
+                    'target_date' => $tontine->target_payout_date ? \Illuminate\Support\Carbon::parse($tontine->target_payout_date)->toDateString() : null,
                 ],
             );
 
@@ -249,7 +249,8 @@ class TontineService
             ];
         }
 
-        $currentCycle = $this->calculateCurrentCycle($tontine);
+        $currentContribCycle = $this->calculateCurrentCycle($tontine, 'contribution');
+        $currentPayoutCycle = $this->calculateCurrentCycle($tontine, 'payout');
 
         // Stats calculation
         $totalPaid = $tontine->payments()->where('status', 'success')->sum('amount');
@@ -258,12 +259,14 @@ class TontineService
             'total_members' => $tontine->members()->count(),
             'active_members' => $tontine->members()->where('status', 'accepted')->count(),
             'total_paid' => $totalPaid,
-            'current_cycle' => $currentCycle,
+            'current_contribution_cycle' => $currentContribCycle,
+            'current_payout_cycle' => $currentPayoutCycle,
+            'current_cycle' => $currentPayoutCycle, // Backwards compatibility
         ];
 
         // Member specific stats - fullname visible par tous, identity_document uniquement créateur/admin
         $isCreatorOrAdmin = $isCreator || $user->is_admin;
-        $membersStats = $tontine->members->map(function ($member) use ($tontine, $currentCycle, $isCreatorOrAdmin) {
+        $membersStats = $tontine->members->map(function ($member) use ($tontine, $currentContribCycle, $isCreatorOrAdmin) {
             $paidCycles = $tontine->payments()
                 ->where('tontine_member_id', $member->id)
                 ->where('status', 'success')
@@ -281,7 +284,7 @@ class TontineService
                 'status' => $member->status,
                 'payout_rank' => $member->payout_rank,
                 'paid_cycles_count' => $paidCycles,
-                'attendance_rate' => $currentCycle > 1 ? round(($paidCycles / ($currentCycle - 1)) * 100, 2) : 100,
+                'attendance_rate' => $currentContribCycle > 1 ? round(($paidCycles / ($currentContribCycle - 1)) * 100, 2) : 100,
                 'total_contributed' => $totalAmountPaid,
                 'payout_received' => $tontine->payouts()->where('tontine_member_id', $member->id)->where('status', 'success')->exists(),
             ];
@@ -451,19 +454,32 @@ class TontineService
         return $member->fresh();
     }
 
-    private function calculateCurrentCycle(Tontine $tontine): int
+    private function calculateCurrentCycle(Tontine $tontine, string $type = 'contribution'): int
     {
         if ($tontine->status !== 'active')
             return 0;
 
-        $now = now();
         $start = $tontine->starts_at;
+        if (!$start) return 0;
 
-        if ($now->lt($start))
-            return 0;
+        if ($type === 'payout') {
+            $freq = $tontine->payout_frequency ?: $tontine->frequency;
+            $num = $tontine->payout_frequency_number ?: $tontine->frequency_number;
+        } else {
+            $freq = $tontine->contribution_frequency ?: $tontine->frequency;
+            $num = $tontine->contribution_frequency_number ?: $tontine->frequency_number;
+        }
+
+        return $this->calculateCyclesSinceStart($start, $freq, $num);
+    }
+
+    private function calculateCyclesSinceStart(\Carbon\Carbon $start, string $frequency, int $number): int
+    {
+        $now = now();
+        if ($now->lt($start)) return 0;
 
         $diff = 0;
-        switch ($tontine->frequency) {
+        switch ($frequency) {
             case 'days':
                 $diff = $start->diffInDays($now);
                 break;
@@ -473,11 +489,38 @@ class TontineService
             case 'months':
                 $diff = $start->diffInMonths($now);
                 break;
+            case 'years':
+                $diff = $start->diffInYears($now);
+                break;
+            default:
+                $diff = $start->diffInDays($now);
+                break;
         }
 
-        $cycle = (int) floor($diff / $tontine->frequency_number) + 1;
+        return (int) floor($diff / max(1, $number)) + 1;
+    }
 
-        return $cycle;
+    public function getPayoutCycleFromContributionCycle(Tontine $tontine, int $contributionCycle): int
+    {
+        $cpp = $this->getContributionsCountPerPayout($tontine);
+        if ($cpp <= 1) return $contributionCycle;
+        
+        return (int) floor(($contributionCycle - 1) / $cpp) + 1;
+    }
+
+    private function getContributionsCountPerPayout(Tontine $tontine): int
+    {
+        if (!$tontine->contribution_frequency || !$tontine->payout_frequency) {
+            return 1;
+        }
+
+        $units = ['days' => 1, 'weeks' => 7, 'months' => 30, 'years' => 365];
+        
+        $c_total = ($units[$tontine->contribution_frequency] ?? 1) * $tontine->contribution_frequency_number;
+        $p_total = ($units[$tontine->payout_frequency] ?? 1) * $tontine->payout_frequency_number;
+
+        if ($c_total <= 0) return 1;
+        return (int) max(1, floor($p_total / $c_total));
     }
 
     public function setRanks(int $tontineId, User $user, array $ranks): void
@@ -528,7 +571,7 @@ class TontineService
             throw ValidationException::withMessages(['tontine_id' => ['La tontine n\'est pas active.']]);
         }
 
-        $cycle = $this->calculateCurrentCycle($tontine);
+        $cycle = $this->calculateCurrentCycle($tontine, 'contribution');
         $reference = 'TON-' . \Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(12));
 
         $baseAmount = (float) $tontine->amount_per_installment;
@@ -639,35 +682,49 @@ class TontineService
             }
 
             // Check if cycle is complete and process payout
-            $this->checkAndProcessPayout($tontine, $payment->cycle_number);
+            $payoutCycle = $this->getPayoutCycleFromContributionCycle($tontine, $payment->cycle_number);
+            $this->checkAndProcessPayout($tontine, $payoutCycle);
 
             return true;
         });
     }
 
-    public function checkAndProcessPayout(Tontine $tontine, int $cycle): void
+    public function checkAndProcessPayout(Tontine $tontine, int $payoutCycle): void
     {
         if ($tontine->type === 'individual') {
-            // Pour les tontines individuelles, le reversement ne se fait pas à chaque cycle,
-            // mais uniquement à la date cible définie (target_payout_date) de manière globale.
             return;
         }
 
-        // 1. Check if everyone in this cycle has paid
-        $expectedCount = $tontine->members()->where('status', 'accepted')->count();
-        $paidMemberIds = $tontine->payments()
-            ->where('cycle_number', $cycle)
-            ->where('status', 'success')
-            ->pluck('tontine_member_id')
-            ->toArray();
-        $paidCount = count($paidMemberIds);
+        // 1. Determine the range of contribution cycles for this payout cycle
+        $cpp = $this->getContributionsCountPerPayout($tontine);
+        $startCycle = ($payoutCycle - 1) * $cpp + 1;
+        $endCycle = $payoutCycle * $cpp;
+        $contributionCycles = range($startCycle, $endCycle);
 
-        // 2. Find the member who should receive the payout for this cycle
-        // Rank matches cycle modulo total accepted members.
-        // Example with 5 members: Cycle 1 -> Rank 1, Cycle 5 -> Rank 5, Cycle 6 -> Rank 1.
-        $rankToFind = $cycle % $expectedCount;
+        // 2. Check if everyone in these cycles has paid
+        $acceptedMembersCount = $tontine->members()->where('status', 'accepted')->count();
+        if ($acceptedMembersCount === 0) return;
+
+        $paidMembersInAllCycles = true;
+        $paidMemberIds = [];
+
+        foreach ($contributionCycles as $cCycle) {
+            $paidInThisCycle = $tontine->payments()
+                ->where('cycle_number', $cCycle)
+                ->where('status', 'success')
+                ->pluck('tontine_member_id')
+                ->toArray();
+            
+            if (count($paidInThisCycle) < $acceptedMembersCount) {
+                $paidMembersInAllCycles = false;
+                break;
+            }
+        }
+
+        // 3. Find the member who should receive the payout for this payout cycle
+        $rankToFind = $payoutCycle % $acceptedMembersCount;
         if ($rankToFind === 0)
-            $rankToFind = $expectedCount;
+            $rankToFind = $acceptedMembersCount;
 
         $beneficiary = $tontine->members()
             ->where('payout_rank', $rankToFind)
@@ -675,39 +732,52 @@ class TontineService
             ->first();
 
         if (!$beneficiary) {
-            Log::warning("No beneficiary found for Tontine {$tontine->id} Cycle {$cycle} (Rank {$rankToFind})");
+            Log::warning("No beneficiary found for Tontine {$tontine->id} Payout Cycle {$payoutCycle} (Rank {$rankToFind})");
             return;
         }
 
-        // 3. Check if already paid out
+        // 4. Check if already paid out
         $alreadyPaid = $tontine->payouts()
             ->where('tontine_member_id', $beneficiary->id)
-            ->where('cycle_number', $cycle)
-            ->where('status', 'success') // On vérifie si un paiement RÉUSSI existe
+            ->where('cycle_number', $payoutCycle)
+            ->where('status', 'success')
             ->exists();
 
         if ($alreadyPaid) {
             return;
         }
 
-        $totalAmount = (float) $tontine->payments()->where('cycle_number', $cycle)->where('status', 'success')->sum('amount');
+        $totalAmount = (float) $tontine->payments()->whereIn('cycle_number', $contributionCycles)->where('status', 'success')->sum('amount');
         $creatorPct = (float) ($tontine->creator_percentage ?? 0);
         $creatorAmount = round($totalAmount * ($creatorPct / 100), 2);
-        $platformAmount = 0; // Déjà pris au dépôt (4.5%)
+        $platformAmount = 0; 
         $beneficiaryAmount = $totalAmount - $creatorAmount;
-        $paidCount = count($paidMemberIds);
 
-        if ($paidCount < $expectedCount) {
-            $unpaidMemberIds = $tontine->members()
-                ->where('status', 'accepted')
-                ->whereNotIn('id', $paidMemberIds)
-                ->pluck('id')
-                ->toArray();
+        if (!$paidMembersInAllCycles) {
+            // Find who hasn't paid in which cycle
+            $unpaidMemberIds = [];
+            foreach ($contributionCycles as $cCycle) {
+                $paidInThisCycle = $tontine->payments()
+                    ->where('cycle_number', $cCycle)
+                    ->where('status', 'success')
+                    ->pluck('tontine_member_id')
+                    ->toArray();
+                
+                $unpaidInThisCycle = $tontine->members()
+                    ->where('status', 'accepted')
+                    ->whereNotIn('id', $paidInThisCycle)
+                    ->pluck('id')
+                    ->toArray();
+                
+                $unpaidMemberIds = array_unique(array_merge($unpaidMemberIds, $unpaidInThisCycle));
+            }
+
+            if (empty($unpaidMemberIds)) return; // Should not happen if paidMembersInAllCycles is false
 
             $unpaidNames = $tontine->members()->whereIn('id', $unpaidMemberIds)->get()->map(fn($m) => $m->display_name)->join(', ');
 
             \App\Models\TontinePayoutRequest::query()->firstOrCreate(
-                ['tontine_id' => $tontine->id, 'cycle_number' => $cycle],
+                ['tontine_id' => $tontine->id, 'cycle_number' => $payoutCycle],
                 [
                     'tontine_member_id' => $beneficiary->id,
                     'amount' => $beneficiaryAmount,
@@ -716,18 +786,15 @@ class TontineService
                 ]
             );
 
-            $msg = "Cycle #{$cycle} : {$unpaidNames} n'ont pas encore payé. Le créateur peut approuver le transfert en acceptant de bloquer ces membres.";
+            $msg = "Virement #{$payoutCycle} : {$unpaidNames} n'ont pas encore payé toutes leurs cotisations. Le créateur peut approuver le transfert en acceptant de bloquer ces membres.";
             if ($tontine->user) {
-                $this->fcmService->sendToUser($tontine->user, "Tontine - Cycle #{$cycle} en attente", $msg);
-            }
-            foreach (User::where('is_admin', true)->get() as $admin) {
-                $this->fcmService->sendToUser($admin, "Tontine - Cycle #{$cycle} en attente", $msg);
+                $this->fcmService->sendToUser($tontine->user, "Tontine - Virement #{$payoutCycle} en attente", $msg);
             }
             return;
         }
 
         if ($tontine->payout_mode === 'automatic') {
-            $this->executePayout($tontine, $beneficiary, $cycle, $beneficiaryAmount, $creatorAmount, $platformAmount, $totalAmount);
+            $this->executePayout($tontine, $beneficiary, $payoutCycle, $beneficiaryAmount, $creatorAmount, $platformAmount, $totalAmount);
         }
     }
 
@@ -809,8 +876,9 @@ class TontineService
                     if ($tontine->user) {
                         $this->fcmService->sendToUser($tontine->user, "Cycle Tontine Terminé", $msg);
                     }
-                    foreach (User::where('is_admin', true)->get() as $admin) {
-                        $this->fcmService->sendToUser($admin, "Cycle Tontine Terminé", $msg);
+                    foreach (\App\Models\User::where('is_admin', true)->get() as $admin) {
+                        /** @var \App\Models\User $admin */
+                        $this->fcmService->sendToUser($admin, "Tontine - Virement #{$cycle} en attente", $msg);
                     }
                 }
             }
@@ -921,8 +989,9 @@ class TontineService
             throw ValidationException::withMessages(['tontine_id' => ['Cette tontine est déjà clôturée.']]);
         }
         
-        if (!$tontine->target_payout_date || now()->startOfDay()->lt($tontine->target_payout_date->startOfDay())) {
-            throw ValidationException::withMessages(['tontine_id' => ['La date de retrait n\'est pas encore atteinte (prévue le ' . ($tontine->target_payout_date?->format('d/m/Y') ?? 'inconnu') . ').']]);
+        if (!$tontine->target_payout_date || Carbon::parse($tontine->target_payout_date)->startOfDay()->lt(now()->startOfDay())) {
+            $formattedDate = $tontine->target_payout_date ? Carbon::parse($tontine->target_payout_date)->format('d/m/Y') : 'inconnu';
+            throw ValidationException::withMessages(['tontine_id' => ['La date de retrait n\'est pas encore atteinte (prévue le ' . $formattedDate . ').']]);
         }
 
         $totalSaved = (float) $tontine->payments()->where('status', 'success')->sum('amount');

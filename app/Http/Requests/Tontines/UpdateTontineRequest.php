@@ -26,6 +26,10 @@ class UpdateTontineRequest extends FormRequest
             'requires_member_registration' => 'nullable|boolean',
             'status' => 'sometimes|in:pending,active,completed,cancelled',
             'target_payout_date' => 'nullable|date',
+            'contribution_frequency' => 'nullable|in:days,weeks,months',
+            'contribution_frequency_number' => 'nullable|integer|min:1',
+            'payout_frequency' => 'nullable|in:weeks,months,years',
+            'payout_frequency_number' => 'nullable|integer|min:1',
         ];
     }
 }

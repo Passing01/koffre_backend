@@ -24,7 +24,7 @@ class TontineReminderCommand extends Command
             if (!$nextDueDate)
                 continue;
 
-            $daysUntil = now()->startOfDay()->diffInDays($nextDueDate->startOfDay(), false);
+            $daysUntil = now()->startOfDay()->diffInDays(\Illuminate\Support\Carbon::parse($nextDueDate)->startOfDay(), false);
 
             $settings = $tontine->notification_settings ?? []; // Array of days, e.g. [1, 2, 3]
 
@@ -52,7 +52,7 @@ class TontineReminderCommand extends Command
             // Notification de retrait pour les tontines individuelles
             if ($tontine->type === 'individual' && $tontine->target_payout_date) {
                 // Notifier le jour même si la date est atteinte
-                if (now()->startOfDay()->equalTo($tontine->target_payout_date->startOfDay()) && $tontine->user) {
+                if (now()->startOfDay()->equalTo(\Illuminate\Support\Carbon::parse($tontine->target_payout_date)->startOfDay()) && $tontine->user) {
                     $fcmService->sendToUser(
                         $tontine->user,
                         "C'est le jour J !",
@@ -76,15 +76,18 @@ class TontineReminderCommand extends Command
         $cycle = $this->calculateCurrentCycle($tontine);
         $next = $start->copy();
 
-        switch ($tontine->frequency) {
+        $freq = $tontine->contribution_frequency ?: $tontine->frequency;
+        $num = $tontine->contribution_frequency_number ?: $tontine->frequency_number;
+
+        switch ($freq) {
             case 'days':
-                $next->addDays($cycle * $tontine->frequency_number);
+                $next->addDays($cycle * $num);
                 break;
             case 'weeks':
-                $next->addWeeks($cycle * $tontine->frequency_number);
+                $next->addWeeks($cycle * $num);
                 break;
             case 'months':
-                $next->addMonths($cycle * $tontine->frequency_number);
+                $next->addMonths($cycle * $num);
                 break;
         }
 
@@ -99,8 +102,11 @@ class TontineReminderCommand extends Command
         if ($now->lt($start))
             return 1;
 
+        $freq = $tontine->contribution_frequency ?: $tontine->frequency;
+        $num = $tontine->contribution_frequency_number ?: $tontine->frequency_number;
+
         $diff = 0;
-        switch ($tontine->frequency) {
+        switch ($freq) {
             case 'days':
                 $diff = $start->diffInDays($now);
                 break;
@@ -112,6 +118,6 @@ class TontineReminderCommand extends Command
                 break;
         }
 
-        return (int) floor($diff / $tontine->frequency_number) + 1;
+        return (int) floor($diff / max(1, $num)) + 1;
     }
 }

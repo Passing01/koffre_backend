@@ -54,7 +54,7 @@
             <div class="p-6 border-b border-gray-700">
                 <h1
                     class="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                    <i class="fas fa-shield-halved"></i> Kofre Admin
+                    <i class="fas fa-shield-halved"></i> KOFFRE Admin
                 </h1>
             </div>
 

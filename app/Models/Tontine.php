@@ -35,6 +35,10 @@ class Tontine extends Model
         'is_random_payout',
         'type',
         'target_payout_date',
+        'contribution_frequency',
+        'contribution_frequency_number',
+        'payout_frequency',
+        'payout_frequency_number',
     ];
 
     protected $casts = [
