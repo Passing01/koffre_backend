@@ -32,7 +32,7 @@ class StoreTontineRequest extends FormRequest
             'identity_document' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'notification_settings' => 'nullable|array',
             'late_fee_amount' => 'nullable|numeric|min:0',
-            'max_participants' => 'nullable|integer|min:1',
+            'max_participants' => 'nullable|integer',
             'requires_member_registration' => 'nullable|boolean',
             'is_random_payout' => 'nullable|boolean',
             'members' => 'required|array|min:1',
