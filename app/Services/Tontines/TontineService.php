@@ -574,17 +574,17 @@ class TontineService
         $cycle = $this->calculateCurrentCycle($tontine, 'contribution');
         $reference = 'TON-' . \Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(12));
 
-        $baseAmount = (float) $tontine->amount_per_installment;
-        $feeRate = (float) config('services.platform.tontine_payment_fee_rate', 0.045);
-        $platformFee = round($baseAmount * $feeRate, 2);
-        $totalCharged = $baseAmount + $platformFee;
+        $totalCharged = (float) $tontine->amount_per_installment;
+        $feeRate = (float) config('services.platform.tontine_payment_fee_rate', 0.048);
+        $platformFee = round($totalCharged * $feeRate, 2);
+        $netAmount = $totalCharged - $platformFee;
 
-        return DB::transaction(function () use ($tontine, $member, $cycle, $reference, $user, $baseAmount, $platformFee, $totalCharged) {
+        return DB::transaction(function () use ($tontine, $member, $cycle, $reference, $user, $netAmount, $platformFee, $totalCharged) {
             $payment = \App\Models\TontinePayment::query()->create([
                 'tontine_id' => $tontine->id,
                 'tontine_member_id' => $member->id,
                 'cycle_number' => $cycle,
-                'amount' => $baseAmount,
+                'amount' => $netAmount,
                 'platform_fee' => $platformFee,
                 'total_charged' => $totalCharged,
                 'payment_reference' => $reference,

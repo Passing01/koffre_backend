@@ -39,16 +39,17 @@ class ContributionService
 
         $reference = 'KOF-' . Str::upper(Str::random(12));
         
-        $commissionRate = (float) config('services.platform.commission_rate', 0.01);
-        $platformFee = round($amount * $commissionRate, 2);
-        $totalCharged = $amount + $platformFee;
+        $commissionRate = (float) config('services.platform.commission_rate', 0.048);
+        $totalCharged = $amount; // Le contributeur paie exactement ce qu'il a saisi
+        $platformFee = round($totalCharged * $commissionRate, 2);
+        $netAmount = $totalCharged - $platformFee; // C'est ce qui ira réellement dans la cagnotte
 
-        return DB::transaction(function () use ($cagnotte, $amount, $platformFee, $totalCharged, $actor, $contributorName, $paymentMethod, $reference) {
+        return DB::transaction(function () use ($cagnotte, $amount, $platformFee, $totalCharged, $netAmount, $actor, $contributorName, $paymentMethod, $reference) {
             $contribution = Contribution::query()->create([
                 'cagnotte_id' => $cagnotte->id,
                 'user_id' => $actor?->id,
                 'contributor_name' => $contributorName ?? $actor?->fullname,
-                'amount' => $amount,
+                'amount' => $netAmount,
                 'platform_fee' => $platformFee,
                 'total_charged' => $totalCharged,
                 'payment_reference' => $reference,
@@ -60,7 +61,7 @@ class ContributionService
                 transactionId: $reference,
                 amount: (float) $totalCharged,
                 currency: 'XOF',
-                description: "Contribution à la cagnotte: {$cagnotte->title} (Montant: {$amount} + Frais: {$platformFee})",
+                description: "Contribution à la cagnotte: {$cagnotte->title}",
                 customer: [
                     'name' => $actor?->fullname ?? $contributorName ?? 'Invité',
                     'email' => $actor?->email ?? 'guest@kofre.com',
@@ -184,16 +185,14 @@ class ContributionService
 
             // Trigger automatic payout if in direct mode
             if ($cagnotte->payout_mode === 'direct') {
-                $commissionRate = config('services.platform.commission_rate', 0.01);
-                $commission = $contribution->amount * $commissionRate;
-                $netAmount = $contribution->amount - $commission;
-
+                // Le montant net est déjà calculé dans $contribution->amount (déduit lors de l'initiation)
+                $netAmountForOwner = (float) $contribution->amount;
                 $payoutAccount = $cagnotte->payout_account ?? $cagnotte->user->phone;
 
                 try {
                     $payoutSuccess = $this->paymentService->payout(
                         account: $payoutAccount,
-                        amount: (float) $netAmount,
+                        amount: (float) $netAmountForOwner,
                         description: "Versement automatique Koffre - Contrib #{$contribution->id}",
                         method: $cagnotte->payout_method
                     );
@@ -248,7 +247,7 @@ class ContributionService
             transactionId: $contribution->payment_reference,
             amount: (float) $contribution->total_charged,
             currency: 'XOF',
-            description: "Contribution à la cagnotte: {$cagnotte->title} (Montant: {$contribution->amount} + Frais: {$contribution->platform_fee})",
+            description: "Contribution à la cagnotte: {$cagnotte->title}",
             customer: [
                 'name'  => $actor?->fullname ?? $contribution->contributor_name ?? 'Invité',
                 'email' => $actor?->email ?? 'guest@kofre.com',
